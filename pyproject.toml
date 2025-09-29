@@ -1,0 +1,40 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "netloom"
+version = "0.1.0"
+description = "Utility for creating and managing topologies for network labs."
+maintainers = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
+authors = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
+requires-python = ">=3.12"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "click",
+  "jinja2",
+  "orjson",
+  "pydantic",
+  "pydantic-yaml",
+]
+
+[dependency-groups]
+dev = [ "pre-commit", "ruff" ]
+docs = [ "mkdocs", "mkdocs-material", "mkdocs-static-i18n" ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = [ "netloom" ]
+
+[tool.ruff]
+line-length = 120
+
+lint.select = [ "E", "F", "I", "N", "S", "UP", "W", "YTT" ]
+lint.isort.lines-after-imports = 2
