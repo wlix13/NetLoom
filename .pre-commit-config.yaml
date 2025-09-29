@@ -1,0 +1,52 @@
+default_install_hook_types:
+  - pre-commit
+  - post-checkout
+  - post-merge
+  - post-rewrite
+default_language_version:
+  python: python3.13
+repos:
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.18.2
+    hooks:
+      - id: mypy
+        args: [--explicit-package-bases, --namespace-packages]
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.11.1
+    hooks:
+      - id: pyproject-fmt
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-illegal-windows-names
+      - id: check-json
+      - id: check-yaml
+      - id: check-shebang-scripts-are-executable
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.13
+    hooks:
+      - id: uv-lock
+      - id: uv-sync
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.14.7
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+      - id: python-check-blanket-type-ignore
+      - id: python-check-mock-methods
+      - id: python-no-eval
