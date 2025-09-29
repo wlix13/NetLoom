@@ -1,0 +1,108 @@
+# PR Type Labels
+- name: "feature"
+  description: "New feature or functionality"
+  color: "28a745"
+
+- name: "bug"
+  description: "Bug fix"
+  color: "d73a4a"
+
+- name: "enhancement"
+  description: "Improvement to existing functionality"
+  color: "17a2b8"
+
+- name: "breaking-change"
+  description: "Changes that break backward compatibility"
+  color: "b60205"
+
+- name: "refactor"
+  description: "Code refactoring without feature changes"
+  color: "9932cc"
+
+- name: "docs"
+  description: "Documentation changes"
+  color: "0075ca"
+
+- name: "tests"
+  description: "Adding or updating tests"
+  color: "2a9d8f"
+
+- name: "ci-cd"
+  description: "CI/CD and workflow changes"
+  color: "264653"
+
+- name: "dependencies"
+  description: "Dependency updates"
+  color: "6f42c1"
+
+- name: "performance"
+  description: "Performance improvements"
+  color: "ff9500"
+
+- name: "security"
+  description: "Security fixes or improvements"
+  color: "ee0701"
+
+# Component Labels
+- name: "cli"
+  description: "CLI commands and interface"
+  color: "5319e7"
+
+- name: "core"
+  description: "Core framework changes"
+  color: "1d76db"
+
+- name: "templates"
+  description: "Jinja2 templates"
+  color: "bfd4f2"
+
+- name: "config"
+  description: "Configuration changes"
+  color: "457b9d"
+
+# Workflow Labels
+- name: "needs-review"
+  description: "Needs code review"
+  color: "fbca04"
+
+- name: "in-progress"
+  description: "Work in progress"
+  color: "ededed"
+
+- name: "ready-to-merge"
+  description: "Approved and ready to merge"
+  color: "0e8a16"
+
+- name: "on-hold"
+  description: "Temporarily paused"
+  color: "d4c5f9"
+
+# Priority Labels
+- name: "priority: critical"
+  description: "Requires immediate attention"
+  color: "b60205"
+
+- name: "priority: high"
+  description: "High priority"
+  color: "d93f0b"
+
+- name: "priority: low"
+  description: "Low priority"
+  color: "0e8a16"
+
+# Meta Labels
+- name: "duplicate"
+  description: "Duplicate issue or PR"
+  color: "cfd3d7"
+
+- name: "invalid"
+  description: "Invalid or not applicable"
+  color: "6c757d"
+
+- name: "wontfix"
+  description: "Will not be addressed"
+  color: "495057"
+
+- name: "skip-changelog"
+  description: "Exclude from release changelog"
+  color: "bfdadc"
