@@ -16,11 +16,15 @@ classifiers = [
 ]
 dependencies = [
   "click",
+  "fattools",
   "jinja2",
   "orjson",
   "pydantic",
   "pydantic-yaml",
+  "rich",
 ]
+
+scripts.netloom = "netloom.cli:cli"
 
 [dependency-groups]
 dev = [ "pre-commit", "ruff" ]
@@ -31,6 +35,15 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = [ "netloom" ]
+
+[tool.hatch.build.targets.wheel.sources]
+"netloom" = "netloom"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "netloom/**/*.py",
+  "netloom/templates/**/*.j2",
+]
 
 [tool.ruff]
 line-length = 120
