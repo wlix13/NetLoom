@@ -1,0 +1,9 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.section_header("Sysctl configuration for " ~ node.name) }}
+{% if node.sysctl.ip_forwarding -%}
+net.ipv4.ip_forward=1
+net.ipv6.conf.all.forwarding=1
+{% endif -%}
+{% for key, value in node.sysctl.custom.items() -%}
+{{ key }}={{ value }}
+{% endfor %}

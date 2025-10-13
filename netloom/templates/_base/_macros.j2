@@ -1,0 +1,23 @@
+{# Shared Jinja2 macros for NetLoom templates #}
+
+{# Render a comment block #}
+{% macro comment(text, prefix='#') -%}
+{{ prefix }} {{ text }}
+{%- endmacro %}
+
+{# Render a section header #}
+{% macro section_header(title, prefix='#') -%}
+{{ prefix }} ============================================================
+{{ prefix }} {{ title }}
+{{ prefix }} ============================================================
+{%- endmacro %}
+
+{# Render an interface list #}
+{% macro interface_list(interfaces, separator=', ') -%}
+{{ interfaces|map(attribute='name')|join(separator) }}
+{%- endmacro %}
+
+{# Check if node has any configured interfaces #}
+{% macro has_configured_interfaces(node) -%}
+{{ node.interfaces|selectattr('configured')|list|length > 0 }}
+{%- endmacro %}

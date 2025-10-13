@@ -1,0 +1,20 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Network configuration for " ~ iface.name ~ " on " ~ node.name) }}
+[Match]
+Name={{ iface.name }}
+
+[Link]
+# MTU={{ iface.mtu if iface.mtu is defined else 1500 }}
+
+[Network]
+{% if iface.dhcp is defined and iface.dhcp -%}
+DHCP=yes
+{% else -%}
+LinkLocalAddressing=no
+{% if iface.ip -%}
+Address={{ iface.ip }}
+{% endif -%}
+{% if iface.gateway -%}
+Gateway={{ iface.gateway }}
+{% endif -%}
+{% endif %}
