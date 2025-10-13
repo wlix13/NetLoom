@@ -1,0 +1,607 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/asvk-topology/schema/1.0",
+  "title": "ASVK Topology Configuration Schema",
+  "description": "JSON Schema for ASVK topology configuration files",
+  "type": "object",
+  "required": ["schema", "meta", "provider", "nodes"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "description": "Schema identifier",
+      "pattern": "^asvk\\.topology/[0-9]+\\.[0-9]+$",
+      "examples": ["asvk.topology/1.0"]
+    },
+    "meta": {
+      "type": "object",
+      "description": "Metadata for the topology configuration",
+      "required": ["id", "title"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the topology",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable name for the topology"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the topology"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "description": "Provider configuration for VMs/containers",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Provider name",
+          "enum": ["virtualbox", "kvm", "container"]
+        },
+        "defaults": {
+          "type": "object",
+          "description": "Default resource allocation",
+          "properties": {
+            "cpu": {
+              "type": "integer",
+              "description": "Default CPU cores",
+              "minimum": 1,
+              "default": 1
+            },
+            "ram_mb": {
+              "type": "integer",
+              "description": "Default RAM in MB",
+              "minimum": 128,
+              "default": 512
+            },
+            "disk_gb": {
+              "type": "integer",
+              "description": "Default disk size in GB",
+              "minimum": 1,
+              "default": 8
+            },
+            "os_image": {
+              "type": "string",
+              "description": "Default OS image"
+            },
+            "nic_model": {
+              "type": "string",
+              "description": "Default NIC model",
+              "enum": ["virtio", "e1000", "rtl8139"]
+            },
+            "promiscuous": {
+              "type": "string",
+              "description": "Promiscuous mode setting",
+              "enum": ["deny", "allow-vms", "allow-all"]
+            }
+          }
+        },
+        "images": {
+          "type": "object",
+          "description": "Custom images for different node types",
+          "properties": {
+            "router": { "type": "string" },
+            "switch": { "type": "string" },
+            "host": { "type": "string" }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default behavior and software configuration",
+      "properties": {
+        "routing": {
+          "type": "object",
+          "properties": {
+            "stack": {
+              "type": "string",
+              "enum": ["bird", "frr", "linux"],
+              "default": "bird"
+            },
+            "protocols_enabled": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["ospf", "rip", "bgp", "static"]
+              },
+              "default": []
+            }
+          }
+        },
+        "switch": {
+          "type": "object",
+          "properties": {
+            "impl": {
+              "type": "string",
+              "enum": ["linux-bridge", "ovs"],
+              "default": "linux-bridge"
+            }
+          }
+        },
+        "firewall": {
+          "type": "object",
+          "properties": {
+            "impl": {
+              "type": "string",
+              "enum": ["nftables", "none"],
+              "default": "nftables"
+            }
+          }
+        },
+        "mgmt": {
+          "type": "object",
+          "properties": {
+            "ssh_user": {
+              "type": "string",
+              "default": "lab"
+            },
+            "ssh_key": {
+              "type": "string",
+              "description": "Path to SSH public key"
+            }
+          }
+        }
+      }
+    },
+    "variables": {
+      "type": "object",
+      "description": "Global variables that can be referenced in templates",
+      "additionalProperties": true
+    },
+    "networks": {
+      "type": "array",
+      "description": "Network definitions (L2 domains, L3 networks, VLAN trunks)",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique network identifier",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["l2", "l3"],
+            "description": "Network type"
+          },
+          "mtu": {
+            "type": "integer",
+            "description": "MTU for the network",
+            "minimum": 68,
+            "maximum": 9000,
+            "default": 1500
+          },
+          "cidr": {
+            "type": "string",
+            "description": "CIDR notation for L3 networks",
+            "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$"
+          },
+          "dhcp": {
+            "type": "boolean",
+            "description": "Enable DHCP on this network",
+            "default": false
+          },
+          "vlan": {
+            "type": "object",
+            "description": "VLAN configuration for trunk ports",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["access", "trunk"]
+              },
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4094
+                },
+                "description": "Allowed VLAN IDs on trunk"
+              },
+              "vid": {
+                "type": "integer",
+                "description": "Native VLAN ID for access ports",
+                "minimum": 1,
+                "maximum": 4094
+              }
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Node definitions (VMs/containers)",
+      "items": {
+        "type": "object",
+        "required": ["name", "role"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Node name",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["router", "switch", "host"],
+            "description": "Node role/type"
+          },
+          "image": {
+            "type": "string",
+            "description": "OS image for the node (can reference provider.images)"
+          },
+          "resources": {
+            "type": "object",
+            "properties": {
+              "cpu": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "ram_mb": {
+                "type": "integer",
+                "minimum": 128
+              },
+              "disk_gb": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "mgmt": {
+            "type": "object",
+            "description": "Management network configuration",
+            "properties": {
+              "ip": {
+                "type": "string",
+                "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$"
+              },
+              "gw": {
+                "type": "string",
+                "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"
+              },
+              "net": {
+                "type": "string"
+              }
+            }
+          },
+          "interfaces": {
+            "type": "array",
+            "description": "Network interfaces (order matters)",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^(eth[0-9]+|lo)$"
+                },
+                "network": {
+                  "type": "string"
+                },
+                "loopback": {
+                  "type": "boolean",
+                  "description": "Indicates if this is a loopback interface"
+                },
+                "addresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$"
+                  }
+                }
+              },
+              "anyOf": [
+                {
+                  "required": ["network"]
+                },
+                {
+                  "required": ["loopback"],
+                  "properties": {
+                    "loopback": { "const": true }
+                  }
+                }
+              ]
+            }
+          },
+          "routing": {
+            "type": "object",
+            "properties": {
+              "stack": {
+                "type": "string",
+                "enum": ["bird", "frr", "linux"]
+              },
+              "protocols": {
+                "type": "object",
+                "properties": {
+                  "static": {
+                    "type": "object",
+                    "properties": {
+                      "routes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["to", "via"],
+                          "properties": {
+                            "to": {
+                              "type": "string",
+                              "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])|0\\.0\\.0\\.0/0$"
+                            },
+                            "via": {
+                              "type": "string",
+                              "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "ospf": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": { "type": "boolean", "default": false },
+                      "impl": {
+                        "type": "string",
+                        "enum": ["bird", "frr"]
+                      }
+                    }
+                  },
+                  "rip": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": { "type": "boolean", "default": false }
+                    }
+                  },
+                  "bgp": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": { "type": "boolean", "default": false },
+                      "asn": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "enabled": { "type": "boolean", "default": true }
+              }
+            }
+          }
+        }
+      }
+    },
+    "switching": {
+      "type": "array",
+      "description": "L2 switching configuration",
+      "items": {
+        "type": "object",
+        "required": ["node", "impl"],
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Switch node name"
+          },
+          "impl": {
+            "type": "string",
+            "enum": ["linux-bridge", "ovs"]
+          },
+          "bridges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "ports": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["if"],
+                    "properties": {
+                      "if": {
+                        "type": "string",
+                        "pattern": "^eth[0-9]+$"
+                      },
+                      "vlan": {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["access", "trunk"]
+                          },
+                          "allowed": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 4094
+                            }
+                          },
+                          "vid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 4094
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "svis": {
+                  "type": "array",
+                  "description": "Switched Virtual Interfaces (SVI)",
+                  "items": {
+                    "type": "object",
+                    "required": ["vid", "ifname"],
+                    "properties": {
+                      "vid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4094
+                      },
+                      "ifname": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9._-]+$"
+                      },
+                      "addresses": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "firewall": {
+      "type": "array",
+      "description": "Firewall configuration",
+      "items": {
+        "type": "object",
+        "required": ["node", "rules"],
+        "properties": {
+          "node": { "type": "string" },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "action"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]+$"
+                },
+                "match": {
+                  "type": "object",
+                  "properties": {
+                    "in_if": { "type": "string" },
+                    "out_if": { "type": "string" },
+                    "src": {
+                      "type": "string",
+                      "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$"
+                    },
+                    "dst": {
+                      "type": "string",
+                      "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$"
+                    },
+                    "ip_proto": {
+                      "type": "string",
+                      "enum": ["tcp", "udp", "icmp", "ospf", "all"]
+                    },
+                    "l4": {
+                      "type": "object",
+                      "properties": {
+                        "proto": {
+                          "type": "string",
+                          "enum": ["tcp", "udp"]
+                        },
+                        "sport": {
+                          "type": ["integer", "array"],
+                          "items": { "type": "integer" },
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "dport": {
+                          "type": ["integer", "array"],
+                          "items": { "type": "integer" },
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "dports": {
+                          "type": ["integer", "array"],
+                          "items": { "type": "integer" },
+                          "minimum": 1,
+                          "maximum": 65535
+                        }
+                      }
+                    }
+                  }
+                },
+                "action": {
+                  "type": "string",
+                  "enum": ["accept", "drop", "reject"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "description": "Configuration profiles/overlays",
+      "items": {
+        "type": "object",
+        "required": ["name", "patches"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "patches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["op", "path"],
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["add", "replace", "remove"]
+                },
+                "path": { "type": "string" },
+                "value": true,
+                "where": {
+                  "type": "object",
+                  "description": "Conditional matching for patches"
+                },
+                "patch": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "description": "Validation tests",
+      "items": {
+        "type": "object",
+        "required": ["name", "from", "to", "expect"],
+        "properties": {
+          "name": { "type": "string" },
+          "from": { "type": "string" },
+          "to": {
+            "type": ["string", "object"],
+            "properties": {
+              "ip": {
+                "type": "string",
+                "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"
+              },
+              "node": { "type": "string" }
+            }
+          },
+          "expect": {
+            "type": "string",
+            "pattern": "^(success|failure|timeout|via .*)$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+schema: asvk.topology/1.0
+meta: { id: lab1-basic-ip, title: "Построение базовой IP-сети" }
+
+provider: { name: virtualbox }
+
+networks:
+  - { id: lan1, type: l2 }
+
+nodes:
+  - name: PC1
+    role: host
+    interfaces:
+      - { name: eth1, network: lan1, addresses: ["192.168.1.1/24"] }
+
+  - name: PC2
+    role: host
+    interfaces:
+      - { name: eth1, network: lan1, addresses: ["192.168.1.2/24"] }
+
+tests:
+  - { name: ping-PC1->PC2, from: PC1, to: 192.168.1.2, expect: success }

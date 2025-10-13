@@ -1,0 +1,160 @@
+# yaml-language-server: $schema=./topology-schema.json
+schema: asvk.topology/1.0
+meta:
+  id: "string"
+  title: "string"
+  description: "string"
+
+provider:
+  name: virtualbox # virtualbox | kvm | container
+  defaults:
+    cpu: 1
+    ram_mb: 512
+    disk_gb: 8
+    os_image: "debian-12-cloud.qcow2"
+    nic_model: virtio
+
+defaults:
+  routing:
+    stack: bird # bird | frr | linux
+    protocols_enabled: []
+  switch:
+    impl: linux-bridge # linux-bridge | ovs
+  firewall:
+    impl: nftables # nftables | none
+  mgmt:
+    ssh_user: "lab"
+    ssh_key: "~/.ssh/id_rsa.pub"
+
+variables: # for templates
+  asn: 65000
+  domain: "lab.local"
+
+networks: # L2 / L3 / VLAN trunks
+  - id: lan1
+    type: l2 # l2 | l3
+    mtu: 1500
+  - id: lan13
+    type: l2
+  - id: trunk1
+    type: l2
+    vlan:
+      mode: trunk
+      allowed: [4, 8]
+  - id: mgmt
+    type: l3
+    cidr: 192.168.100.0/24
+    dhcp: false
+
+nodes: # nodes (VM/containers)
+  - name: R1
+    role: router # router | switch | host
+    resources:
+      cpu: 1
+      ram_mb: 512
+    mgmt:
+      ip: 192.168.100.11/24
+      gw: 192.168.100.1
+      net: mgmt
+    interfaces: # order matters: eth1 ↔ adapter2 and so on
+      - name: eth1
+        network: lan13
+        addresses: ["10.0.13.1/24"]
+      - name: eth0 # MGMT
+        network: mgmt
+    routing:
+      stack: bird # inherited from defaults, can be omitted
+      protocols:
+        static:
+          routes:
+            - to: 0.0.0.0/0
+              via: 10.0.13.3
+        ospf: # if needed
+          enabled: false
+        rip:
+          enabled: false
+    services: # servers/daemons of the host
+      - name: sshd
+        enabled: true
+
+switching: # L2 config for switch nodes
+  - node: S1
+    impl: linux-bridge # linux-bridge | ovs
+    bridges:
+      - name: br0
+        ports:
+          - if: eth1 # to trunk1
+            vlan:
+              mode: trunk
+              allowed: [4, 8]
+          - if: eth2 # access → VLAN 4
+            vlan:
+              mode: access
+              vid: 4
+          - if: eth3 # access → VLAN 8
+            vlan:
+              mode: access
+              vid: 8
+        svis: # VLAN management interfaces (SVI)
+          - vid: 4
+            ifname: br0.4
+            addresses: ["10.0.4.254/24"]
+
+firewall: # High-level ACL-> to nftables
+  - node: R2
+    rules:
+      - id: allow-ospf
+        match:
+          in_if: eth1
+          ip_proto: ospf
+        action: accept
+      - id: telnet-from-R1-to-S1
+        match:
+          src: 10.0.13.1/32
+          dst: 10.0.4.254/32
+          l4: { proto: tcp, dport: 23 }
+        action: accept
+      - id: ftp-from-R3-to-S2
+        match:
+          src: 10.0.13.3/32
+          dst: 10.0.6.254/32
+          l4: { proto: tcp, dports: [20, 21] }
+        action: accept
+      - id: drop-rest
+        action: drop
+
+profiles: # overlays - patches on top of the base description
+  - name: "all-frr"
+    description: "Switch all control-plane to FRR"
+    patches:
+      - op: replace
+        path: /defaults/routing/stack
+        value: frr
+  - name: "mix-bird-frr-ospf"
+    description: "BIRD by default, but OSPF on R2 via FRR"
+    patches:
+      - op: add
+        path: /nodes
+        where:
+          name: R2
+        patch:
+          routing:
+            protocols:
+              ospf:
+                enabled: true
+                impl: frr
+  - name: "switch-ovs"
+    patches:
+      - op: replace
+        path: /defaults/switch/impl
+        value: ovs
+
+tests: # tests (expected result)
+  - name: ping-R1-to-R3
+    from: R1
+    to: 10.0.13.3
+    expect: success
+  - name: ping-VLAN-4-R1-to-R3
+    from: R1
+    to: 10.0.4.1
+    expect: success

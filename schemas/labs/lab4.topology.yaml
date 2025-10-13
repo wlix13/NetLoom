@@ -1,0 +1,68 @@
+schema: asvk.topology/1.0
+meta: { id: lab4-vlan, title: "Настройка VLAN" }
+
+provider: { name: virtualbox }
+
+networks:
+  - { id: trunk1, type: l2, vlan: { mode: trunk, allowed: [2, 3, 4] } }
+
+nodes:
+  - name: S1
+    role: switch
+    interfaces:
+      - { name: eth1, network: trunk1 } # trunk к S2
+      - { name: eth2, network: trunk1 } # access V3
+      - { name: eth3, network: trunk1 } # access V4
+
+  - name: S2
+    role: switch
+    interfaces:
+      - { name: eth1, network: trunk1 } # trunk к S1
+      - { name: eth2, network: trunk1 } # access V4
+
+  - name: R1
+    role: host
+    interfaces:
+      - { name: eth1, network: trunk1 } # физически втыкнут в access VLAN4 на S1
+
+  - name: R3
+    role: host
+    interfaces:
+      - { name: eth1, network: trunk1 } # физически втыкнут в access VLAN4 на S2
+
+  - name: R1
+    role: router
+    routing: { stack: linux }
+    init:
+      commands:
+        - ip addr add 10.0.4.1/24 dev eth1 # потому что S1 даёт untagged VLAN4 на порту к R1
+
+  - name: R3
+    role: router
+    routing: { stack: linux }
+    init:
+      commands:
+        - ip addr add 10.0.4.3/24 dev eth1
+
+switching:
+  - node: S1
+    impl: linux-bridge
+    bridges:
+      - name: br0
+        ports:
+          - { if: eth1, vlan: { mode: trunk, allowed: [2, 3, 4] } }
+          - { if: eth2, vlan: { mode: access, vid: 3 } } # к хосту VLAN3
+          - { if: eth3, vlan: { mode: access, vid: 4 } } # к R1
+        svis:
+          - { vid: 1, ifname: br0.1, addresses: ["10.0.4.2/24"] }
+
+  - node: S2
+    impl: linux-bridge
+    bridges:
+      - name: br0
+        ports:
+          - { if: eth1, vlan: { mode: trunk, allowed: [2, 3, 4] } }
+          - { if: eth2, vlan: { mode: access, vid: 4 } } # к R3
+
+tests:
+  - { name: ping-R1→R3, from: R1, to: 10.0.4.3, expect: success }
