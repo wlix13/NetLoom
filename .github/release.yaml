@@ -1,0 +1,56 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+      - skip-changelog
+    authors:
+      - dependabot
+      - dependabot[bot]
+      - github-actions[bot]
+      - renovate[bot]
+
+  categories:
+    - title: 💥 Breaking Changes
+      labels:
+        - breaking-change
+    - title: ✨ Features & Enhancements
+      labels:
+        - feature
+        - enhancement
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+    - title: 🏗️ Core & Architecture
+      labels:
+        - core
+        - refactor
+    - title: ⚙️ CLI & Commands
+      labels:
+        - cli
+    - title: 📝 Templates
+      labels:
+        - templates
+    - title: 🔧 Configuration & CI
+      labels:
+        - config
+        - ci-cd
+    - title: 📚 Documentation
+      labels:
+        - docs
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+    - title: 🧪 Testing
+      labels:
+        - tests
+    - title: ⚡ Performance
+      labels:
+        - performance
+    - title: 🔒 Security
+      labels:
+        - security
+    - title: 📝 Other
+      labels:
+        - "*"
