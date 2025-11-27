@@ -53,3 +53,21 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.blocks.admonition
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      languages:
+        - locale: en
+          name: English
+          default: true
+          nav:
+            - Home: index.md
+            - Getting Started: getting-started.md
+            - CLI Reference: cli-reference.md
+            - Shell Completion: shell-completion.md
+            - Topology Schema: topology-schema.md
+            - Architecture: architecture.md
+            - Configuration: configuration.md
+            - GitHub: https://github.com/wlix13/NetLoom
