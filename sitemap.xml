@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/architecture/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/architecture/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/cli-reference/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/cli-reference/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/configuration/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/configuration/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/getting-started/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/shell-completion/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/shell-completion/"/>
+    </url>
+    <url>
+        <loc>https://wlix13.github.io/NetLoom/topology-schema/</loc>
+        <lastmod>2025-11-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://wlix13.github.io/NetLoom/topology-schema/"/>
+    </url>
+</urlset>
