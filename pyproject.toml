@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "netloom"
-version = "0.1.0"
+version = "0.1.1"
 description = "Utility for creating and managing topologies for network labs."
 maintainers = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
 authors = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
