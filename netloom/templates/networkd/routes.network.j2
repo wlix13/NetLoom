@@ -1,0 +1,13 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.routing and node.routing.static_routes -%}
+{{ macros.comment("Static routes for " ~ node.name) }}
+[Match]
+Name=*
+
+{% for route in node.routing.static_routes -%}
+[Route]
+Destination={{ route.destination }}
+Gateway={{ route.gateway }}
+
+{% endfor %}
+{% endif %}

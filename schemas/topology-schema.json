@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://asvk.topology/schema/3.0",
+  "title": "ASVK Structured Topology (No-Files/No-Packages)",
+  "type": "object",
+  "required": ["meta", "links", "nodes"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "ip_forwarding": { "type": "boolean", "default": false },
+        "sysctl": {
+          "type": "object",
+          "description": "Global kernel parameters (e.g. net.ipv4.ip_forward=1)"
+        },
+        "vbox": {
+          "type": "object",
+          "description": "VirtualBox-specific VM settings.",
+          "properties": {
+            "paravirt_provider": {
+              "type": "string",
+              "enum": ["default", "legacy", "minimal", "hyperv", "kvm", "none"],
+              "default": "kvm",
+              "description": "Paravirtualization provider."
+            },
+            "chipset": {
+              "type": "string",
+              "enum": ["piix3", "ich9"],
+              "default": "ich9",
+              "description": "Chipset type."
+            },
+            "ioapic": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable I/O APIC."
+            },
+            "hpet": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable High Precision Event Timer."
+            }
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "description": "Physical connections. Tool maps these sequentially to eth1, eth2, etc.",
+      "items": {
+        "type": "object",
+        "required": ["endpoints"],
+        "properties": {
+          "endpoints": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": {
+            "type": "string",
+            "enum": ["router", "switch", "host"],
+            "default": "host"
+          },
+          "sysctl": {
+            "type": "object",
+            "description": "Node-specific kernel parameters."
+          },
+          "interfaces": {
+            "type": "array",
+            "description": "Logical config for physical interfaces (eth1, eth2...).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {
+                  "type": "string",
+                  "description": "CIDR (e.g. 10.0.12.1/24)"
+                },
+                "gateway": { "type": "string" },
+                "configured": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "If false, data is kept for grading/docs, but config file is NOT generated."
+                }
+              }
+            }
+          },
+          "bridge": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "default": "br0" },
+              "stp": { "type": "boolean", "default": false },
+              "configured": { "type": "boolean", "default": true }
+            }
+          },
+          "routing": {
+            "type": "object",
+            "properties": {
+              "engine": { "type": "string", "enum": ["bird", "frr", "none"] },
+              "router_id": { "type": "string" },
+              "static": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "ospf": {
+                "type": "object",
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "areas": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "default": "0.0.0.0" },
+                        "interfaces": {
+                          "type": "array",
+                          "items": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "configured": { "type": "boolean", "default": true }
+            }
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "http_server": { "type": "integer" },
+              "wireguard": {
+                "type": "object",
+                "properties": {
+                  "private_key": { "type": "string" },
+                  "listen_port": { "type": "integer" },
+                  "address": { "type": "string" },
+                  "peers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "public_key": { "type": "string" },
+                        "allowed_ips": { "type": "string" },
+                        "endpoint": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              },
+              "firewall": {
+                "type": "object",
+                "properties": {
+                  "impl": { "type": "string", "enum": ["nftables"] },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["action"],
+                      "properties": {
+                        "action": {
+                          "type": "string",
+                          "enum": ["accept", "drop", "reject"]
+                        },
+                        "src": { "type": "string" },
+                        "dst": { "type": "string" },
+                        "proto": { "type": "string" },
+                        "dport": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "commands": {
+            "type": "array",
+            "description": "Raw shell commands for edge cases (e.g. ipip tunnels).",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

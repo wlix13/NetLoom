@@ -11,6 +11,13 @@ repos:
     hooks:
       - id: mypy
         args: [--explicit-package-bases, --namespace-packages]
+        additional_dependencies:
+          - types-pyyaml
+          - types-jinja2
+          - types-orjson
+          - pydantic
+          - rich-click
+          - fattools
 
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: v2.11.1

@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=./topology-schema.json
+meta:
+  id: "lab-example"
+  name: "Example Lab Topology"
+  description: "Example network lab configuration demonstrating the schema structure"
+
+defaults:
+  ip_forwarding: false
+  sysctl:
+    net.core.somaxconn: 1024
+
+links:
+  # Physical connections between nodes
+  # Order determines interface assignment (eth1, eth2, etc.)
+  - endpoints: ["R1", "R2"]
+  - endpoints: ["R2", "R3"]
+  - endpoints: ["R1", "S1"]
+  - endpoints: ["S1", "H1"]
+
+nodes:
+  - name: R1
+    role: router
+    sysctl:
+      net.ipv4.ip_forward: 1
+    interfaces:
+      - ip: "10.0.1.1/24"
+        gateway: "10.0.1.254"
+      - ip: "10.0.2.1/24"
+    routing:
+      engine: bird
+      router_id: "192.168.1.1"
+      static:
+        - "10.0.3.0/24 via 10.0.1.2"
+        - "0.0.0.0/0 via 10.0.1.254"
+      ospf:
+        enabled: true
+        areas:
+          - id: "0.0.0.0"
+            interfaces: ["eth1"]
+          - id: "0.0.0.1"
+            interfaces: ["eth2"]
+    commands:
+      - "systemctl enable bird"
+
+  - name: R2
+    role: router
+    interfaces:
+      - ip: "10.0.1.2/24"
+      - ip: "10.0.3.1/24"
+    routing:
+      engine: frr
+      router_id: "192.168.1.2"
+      static:
+        - "10.0.2.0/24 via 10.0.1.1"
+
+  - name: R3
+    role: router
+    interfaces:
+      - ip: "10.0.3.2/24"
+    routing:
+      engine: none
+
+  - name: S1
+    role: switch
+    bridge:
+      name: br0
+      stp: true
+    interfaces:
+      - configured: false  # Managed by bridge
+      - configured: false
+
+  - name: H1
+    role: host
+    interfaces:
+      - ip: "192.168.1.10/24"
+        gateway: "192.168.1.1"
+    services:
+      http_server: 8080
+      firewall:
+        impl: nftables
+        rules:
+          - action: accept
+            proto: tcp
+            dport: 8080
+          - action: drop
+            src: "0.0.0.0/0"

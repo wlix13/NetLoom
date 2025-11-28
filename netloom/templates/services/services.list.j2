@@ -1,0 +1,19 @@
+{# VM services list for the boot agent #}
+{# Format: + service (enable) or - service (disable) #}
+{% if node.interfaces|selectattr('configured')|list -%}
++ systemd-networkd
+{% endif -%}
+{% if node.routing and node.routing.ospf_enabled -%}
+{% if node.routing.engine == 'frr' -%}
++ frr
+{% elif node.routing.engine == 'bird' -%}
++ bird
+{% endif -%}
+{% endif -%}
+{% if node.services and node.services.firewall -%}
+- iptables
++ nftables
+{% endif -%}
+{% if node.services and node.services.wireguard -%}
++ wg-quick@wg0
+{% endif -%}
