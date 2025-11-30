@@ -6,6 +6,8 @@ from pathlib import Path
 import click
 import rich_click
 
+from netloom.models.internal import InternalTopology
+
 from .core.application import Application
 from .core.paramtypes import DirectoryType, OvaFileType, TemplateSetType, TopologyFileType
 
@@ -222,12 +224,50 @@ def list_templates(obj):
 
 
 @cli.command("show")
+@click.option(
+    "--routing",
+    "-r",
+    is_flag=True,
+    help="Show routing config",
+)
+@click.option(
+    "--services",
+    "-s",
+    is_flag=True,
+    help="Show services config",
+)
+@click.option(
+    "--bridges",
+    "-b",
+    is_flag=True,
+    help="Show bridge config",
+)
+@click.option(
+    "--sysctl",
+    "-y",
+    is_flag=True,
+    help="Show sysctl settings",
+)
+@click.option(
+    "--all",
+    "-a",
+    "show_all",
+    is_flag=True,
+    help="Show all sections",
+)
 @click.pass_obj
-def show_topology(obj):
+def show_topology(
+    obj,
+    routing: bool,
+    services: bool,
+    bridges: bool,
+    sysctl: bool,
+    show_all: bool,
+):
     """Display topology information."""
 
     app: Application = obj["app"]
-    internal = obj["internal"]
+    internal: InternalTopology = obj["internal"]
 
     app.console.print(f"[bold]Topology:[/bold] {internal.name} ({internal.id})")
     if internal.description:
@@ -242,6 +282,80 @@ def show_topology(obj):
             peer = f" -> {iface.peer_node}" if iface.peer_node else ""
             ip = f" [{iface.ip}]" if iface.ip else ""
             app.console.print(f"    {iface.name}{ip}{peer}")
+
+        # routing section
+        if (routing or show_all) and node.routing:
+            routing_info = []
+            if node.routing.engine:
+                routing_info.append(f"[bold]{node.routing.engine}[/bold]")
+            if node.routing.router_id:
+                routing_info.append(f"router-id: {node.routing.router_id}")
+            if routing_info:
+                app.console.print(f"    [blue]Routing:[/blue] {' '.join(routing_info)}")
+
+            # static routes
+            if node.routing.static_routes:
+                for route in node.routing.static_routes:
+                    app.console.print(f"      Static: {route.destination} via {route.gateway}")
+
+            # ospf
+            if node.routing.ospf_enabled and node.routing.ospf_areas:
+                for area in node.routing.ospf_areas:
+                    interfaces_str = ", ".join(area.interfaces) if area.interfaces else "none"
+                    app.console.print(f"      OSPF area {area.id}: {interfaces_str}")
+
+        # services section
+        if (services or show_all) and node.services:
+            app.console.print("    [green]Services:[/green]")
+
+            # http server
+            if node.services.http_server_port:
+                app.console.print(f"      HTTP: port {node.services.http_server_port}")
+
+            # wireguard
+            if node.services.wireguard:
+                wg = node.services.wireguard
+                app.console.print(f"      WireGuard: {wg.address} :{wg.listen_port}")
+                for peer in wg.peers:  # type: ignore[assignment]
+                    app.console.print(f"        Peer: {peer.public_key[:8]}... -> {peer.allowed_ips}")  # type: ignore[attr-defined]
+
+            # firewall
+            if node.services.firewall:
+                fw = node.services.firewall
+                app.console.print(f"      Firewall ({fw.impl}):")
+                for rule in fw.rules:
+                    rule_parts: list[str] = []
+                    if rule.action:
+                        rule_parts.append(rule.action)  # type: ignore[arg-type]
+                    if rule.proto:
+                        rule_parts.append(rule.proto)  # type: ignore[arg-type]
+                    if rule.src:
+                        rule_parts.append(f"src {rule.src}")
+                    if rule.dst:
+                        rule_parts.append(f"dst {rule.dst}")
+                    if rule.dport:
+                        rule_parts.append(f"dport {rule.dport}")
+                    rule_str = " ".join(rule_parts)
+                    app.console.print(f"        {rule_str}")
+
+        # bridges section
+        if (bridges or show_all) and node.bridge:
+            stp_status = "[green]enabled[/green]" if node.bridge.stp else "[red]disabled[/red]"
+            app.console.print(f"    [yellow]Bridge:[/yellow] {node.bridge.name} (STP: {stp_status})")
+            if node.bridge.interfaces:
+                members_str = ", ".join(node.bridge.interfaces)
+                app.console.print(f"      Members: {members_str}")
+
+        # sysctl section
+        if (sysctl or show_all) and node.sysctl:
+            app.console.print("    [red]Sysctl:[/red]")
+            if node.sysctl.ip_forwarding:
+                ip_forwarding_status = "[green]enabled[/green]" if node.sysctl.ip_forwarding else "[red]disabled[/red]"
+                app.console.print(f"      ip_forwarding: {ip_forwarding_status}")
+
+            if node.sysctl.custom:
+                for key, value in node.sysctl.custom.items():
+                    app.console.print(f"      {key}={value}")
 
     app.console.print()
     app.console.print(f"[bold]Links:[/bold] {len(internal.links)}")
