@@ -108,6 +108,8 @@ Node definitions. **Required**.
 | `role` | string | `host` | Node role: `router`, `switch`, `host` |
 | `sysctl` | object | - | Node-specific kernel parameters |
 | `interfaces` | array | - | Interface configurations |
+| `vlans` | array | - | VLAN interface configurations |
+| `tunnels` | array | - | IP tunnel configurations |
 | `bridge` | object | - | Bridge configuration (for switches) |
 | `routing` | object | - | Routing daemon configuration |
 | `services` | object | - | Service configurations |
@@ -149,6 +151,49 @@ interfaces:
   - configured: false           # eth3 - unmanaged
 ```
 
+### vlans
+
+VLAN (802.1Q) interface configurations.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | VLAN ID (1-4094) |
+| `parent` | string | Parent interface name (e.g., `eth1`) |
+| `ip` | string | IP address in CIDR notation |
+| `gateway` | string | Default gateway IP |
+
+```yaml
+vlans:
+  - id: 100
+    parent: eth1
+    ip: "10.100.0.1/24"
+  - id: 200
+    parent: eth1
+    ip: "10.200.0.1/24"
+    gateway: "10.200.0.254"
+```
+
+### tunnels
+
+IP tunnel configurations (IPIP, GRE, SIT).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | `tun0` | Tunnel interface name |
+| `type` | string | `ipip` | Tunnel type: `ipip`, `gre`, `sit` |
+| `local` | string | *required* | Local endpoint IP address |
+| `remote` | string | *required* | Remote endpoint IP address |
+| `ip` | string | - | IP address in CIDR notation for the tunnel interface |
+
+```yaml
+tunnels:
+  - name: tun0
+    type: ipip
+    local: "203.0.113.1"
+    remote: "198.51.100.1"
+    ip: "10.255.0.1/30"
+```
+
 ### bridge
 
 Bridge configuration for switch nodes.
@@ -180,6 +225,7 @@ Routing daemon configuration.
 | `router_id` | string | - | Router ID (usually an IP) |
 | `static` | array | - | Static routes |
 | `ospf` | object | - | OSPF configuration |
+| `rip` | object | - | RIP configuration |
 | `configured` | boolean | `true` | If `false`, no config file is generated |
 
 #### Static Routes
@@ -217,6 +263,24 @@ routing:
         interfaces: ["eth1", "eth2"]
       - id: "0.0.0.1"
         interfaces: ["eth3"]
+```
+
+#### RIP Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable RIP |
+| `version` | integer | `2` | RIP version (1 or 2) |
+| `interfaces` | array | - | Interfaces participating in RIP |
+
+```yaml
+routing:
+  engine: bird
+  router_id: "192.168.1.1"
+  rip:
+    enabled: true
+    version: 2
+    interfaces: ["eth1", "eth2"]
 ```
 
 ### services

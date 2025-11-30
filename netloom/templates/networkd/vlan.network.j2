@@ -1,0 +1,13 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Network configuration for VLAN " ~ vlan.name ~ " on " ~ node.name) }}
+[Match]
+Name={{ vlan.name }}
+
+[Network]
+LinkLocalAddressing=no
+{% if vlan.ip -%}
+Address={{ vlan.ip }}
+{% endif -%}
+{% if vlan.gateway -%}
+Gateway={{ vlan.gateway }}
+{% endif %}

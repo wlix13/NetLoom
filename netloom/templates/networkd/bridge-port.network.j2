@@ -1,0 +1,9 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.bridge and node.bridge.configured -%}
+{{ macros.comment("Bridge port configuration for " ~ iface.name ~ " on " ~ node.name) }}
+[Match]
+Name={{ iface.name }}
+
+[Network]
+Bridge={{ node.bridge.name }}
+{% endif %}

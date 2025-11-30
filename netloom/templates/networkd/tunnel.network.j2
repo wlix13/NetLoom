@@ -1,0 +1,9 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Network configuration for tunnel " ~ tunnel.name ~ " on " ~ node.name) }}
+[Match]
+Name={{ tunnel.name }}
+
+[Network]
+{% if tunnel.ip -%}
+Address={{ tunnel.ip }}
+{% endif %}

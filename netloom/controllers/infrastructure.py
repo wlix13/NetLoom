@@ -294,7 +294,7 @@ class InfrastructureController(BaseController["Application"]):
     def _wire_nics(self, node: "InternalNode") -> None:
         """Wire network interfaces to VirtualBox internal networks."""
 
-        for i in range(1, 9):
+        for i in range(1, 37):
             _run(
                 [
                     "VBoxManage",
@@ -314,22 +314,29 @@ class InfrastructureController(BaseController["Application"]):
         nic_type = type_map[node.nic_model]
 
         for iface in node.interfaces:
+            if iface.vbox_nic_index is None:
+                continue
+
             intnet = iface.vbox_network_name or f"intnet:{node.name}-{iface.name}"
-            _run(
-                [
-                    "VBoxManage",
-                    "modifyvm",
-                    node.name,
-                    f"--nic{iface.vbox_nic_index}",
-                    "intnet",
-                    f"--intnet{iface.vbox_nic_index}",
-                    intnet,
-                    f"--nictype{iface.vbox_nic_index}",
-                    nic_type,
-                    f"--cableconnected{iface.vbox_nic_index}",
-                    "on",
-                ]
-            )
+            cmd = [
+                "VBoxManage",
+                "modifyvm",
+                node.name,
+                f"--nic{iface.vbox_nic_index}",
+                "intnet",
+                f"--intnet{iface.vbox_nic_index}",
+                intnet,
+                f"--nictype{iface.vbox_nic_index}",
+                nic_type,
+                f"--cableconnected{iface.vbox_nic_index}",
+                "on",
+            ]
+
+            if iface.mac_address:
+                mac_stripped = iface.mac_address.replace(":", "")
+                cmd.extend([f"--macaddress{iface.vbox_nic_index}", mac_stripped])
+
+            _run(cmd)
 
     def init(self, topo: "InternalTopology", workdir: str | Path) -> None:
         """Initialize: import base OVA and create workdir structure."""

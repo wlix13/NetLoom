@@ -1,0 +1,26 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.routing and node.routing.ospf_enabled -%}
+{{ macros.comment("OSPF routing configuration for " ~ node.name) }}
+
+protocol ospf v2 ospf_v2 {
+    ipv4 {
+        import all;
+        export all;
+    };
+
+{% for area in node.routing.ospf_areas -%}
+    area {{ area.id }} {
+{% for iface in area.interfaces -%}
+        interface "{{ iface }}" {
+            hello 10;
+            retransmit 5;
+            cost 10;
+            transmit delay 1;
+            dead 40;
+            type broadcast;
+        };
+{% endfor -%}
+    };
+{% endfor -%}
+}
+{% endif %}

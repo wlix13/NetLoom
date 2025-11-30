@@ -36,6 +36,7 @@ class Defaults(BaseModel):
     """Global defaults applied to all nodes."""
 
     ip_forwarding: bool = False
+    mac_generation: Literal["random", "deterministic"] = "deterministic"
     sysctl: dict[str, Any] | None = Field(
         default=None,
         description="Global kernel parameters (e.g. net.ipv4.ip_forward=1)",
@@ -56,6 +57,14 @@ class Link(BaseModel):
 class InterfaceConfig(BaseModel):
     """Logical configuration for a physical interface (eth1, eth2, etc.)."""
 
+    name: str | None = Field(
+        default=None,
+        description="Custom interface name (overrides automatic naming).",
+    )
+    mac: str | None = Field(
+        default=None,
+        description="Static MAC address (e.g. 02:00:00:00:00:01).",
+    )
     ip: str | None = Field(
         default=None,
         description="CIDR (e.g. 10.0.12.1/24)",
@@ -64,6 +73,43 @@ class InterfaceConfig(BaseModel):
     configured: bool = Field(
         default=True,
         description="If false, config file is NOT generated.",
+    )
+
+
+class VLANConfig(BaseModel):
+    """VLAN (802.1Q) interface configuration."""
+
+    id: Annotated[int, Field(ge=1, le=4094)]
+    """VLAN ID (1-4094)."""
+
+    parent: str
+    """Parent interface name (e.g., eth1)."""
+
+    ip: str | None = Field(
+        default=None,
+        description="IP address in CIDR notation for the VLAN interface.",
+    )
+    gateway: str | None = None
+
+
+class TunnelConfig(BaseModel):
+    """IP tunnel configuration (IPIP, GRE, SIT)."""
+
+    name: str = "tun0"
+    """Tunnel interface name."""
+
+    type: Literal["ipip", "gre", "sit"] = "ipip"
+    """Tunnel type."""
+
+    local: str
+    """Local endpoint IP address."""
+
+    remote: str
+    """Remote endpoint IP address."""
+
+    ip: str | None = Field(
+        default=None,
+        description="IP address in CIDR notation for the tunnel interface.",
     )
 
 
@@ -98,6 +144,19 @@ class OSPFConfig(BaseModel):
     )
 
 
+class RIPConfig(BaseModel):
+    """RIP routing configuration."""
+
+    enabled: bool = False
+    version: Literal[1, 2] = 2
+    """RIP version (1 or 2)."""
+
+    interfaces: list[str] | None = Field(
+        default=None,
+        description="List of interfaces participating in RIP.",
+    )
+
+
 class RoutingConfig(BaseModel):
     """Routing configuration for a node."""
 
@@ -108,6 +167,7 @@ class RoutingConfig(BaseModel):
         description="Static routes (e.g., '10.0.0.0/8 via 192.168.1.1')",
     )
     ospf: OSPFConfig | None = None
+    rip: RIPConfig | None = None
     configured: bool = Field(
         default=True,
         description="If false, config file is NOT generated.",
@@ -174,6 +234,14 @@ class Node(BaseModel):
     interfaces: list[InterfaceConfig] | None = Field(
         default=None,
         description="Logical config for physical interfaces (eth1, eth2...).",
+    )
+    vlans: list[VLANConfig] | None = Field(
+        default=None,
+        description="VLAN (802.1Q) interface configurations.",
+    )
+    tunnels: list[TunnelConfig] | None = Field(
+        default=None,
+        description="IP tunnel configurations (IPIP, GRE, SIT).",
     )
     bridge: BridgeConfig | None = None
     routing: RoutingConfig | None = None

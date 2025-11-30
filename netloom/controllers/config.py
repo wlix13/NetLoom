@@ -58,7 +58,6 @@ class ConfigController(BaseController["Application"]):
     def generate(
         self,
         topo: "InternalTopology",
-        template_set: str = "networkd",
         extra_paths: list[Path] | None = None,
     ) -> None:
         """Generate configs for all nodes using a template set."""
@@ -77,7 +76,20 @@ class ConfigController(BaseController["Application"]):
                 "topology": topo,
             }
 
-            self._render_template_set(env, template_set, context, outdir)
+            # Render the primary template set
+            self._render_template_set(env, "networkd", context, outdir)
+
+            # Render BIRD templates if routing is configured with bird engine
+            if node.routing and node.routing.engine == "bird" and node.routing.configured:
+                self._render_template_set(env, "bird", context, outdir)
+
+            # Render nftables templates if firewall is configured
+            if node.services and node.services.firewall:
+                self._render_template_set(env, "nftables", context, outdir)
+
+            # Render WireGuard templates if WireGuard is configured
+            if node.services and node.services.wireguard:
+                self._render_template_set(env, "wireguard", context, outdir)
 
             self._generate_services_list(env, node, outdir)
 
@@ -103,22 +115,86 @@ class ConfigController(BaseController["Application"]):
         for template_file in set_dir.glob("*.j2"):
             template_name = f"{template_set}/{template_file.name}"
             template = env.get_template(template_name)
+            template_stem = template_file.stem
 
-            output_path = self._get_output_path(template_file.stem, node, outdir)
+            output_path = self._get_output_path(template_stem, node, outdir)
             if output_path:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path_str = str(output_path)
 
-                # For per-interface templates, render once per interface
+                # Per-interface templates
                 if "{iface}" in output_path_str:
-                    for iface in node.interfaces:
-                        if not iface.configured:
-                            continue
-                        iface_context = {**context, "iface": iface}
-                        content = template.render(iface_context)
-                        iface_path = Path(output_path_str.replace("{iface}", iface.name))
-                        iface_path.parent.mkdir(parents=True, exist_ok=True)
-                        iface_path.write_text(content, encoding="utf-8", newline="\n")
+                    # VLAN parent interface templates
+                    if "vlan-parent" in template_stem:
+                        # Only render for interfaces that have VLANs configured
+                        parent_ifaces = {vlan.parent for vlan in node.vlans}
+                        for iface in node.interfaces:
+                            if iface.name in parent_ifaces:
+                                iface_context = {**context, "iface": iface}
+                                content = template.render(iface_context)
+                                if content.strip():
+                                    iface_path = Path(output_path_str.replace("{iface}", iface.name))
+                                    iface_path.parent.mkdir(parents=True, exist_ok=True)
+                                    iface_path.write_text(content, encoding="utf-8", newline="\n")
+                    # Bridge port templates
+                    elif "bridge-port" in template_stem:
+                        if node.bridge and node.bridge.configured:
+                            for iface in node.interfaces:
+                                iface_context = {**context, "iface": iface}
+                                content = template.render(iface_context)
+                                if content.strip():
+                                    iface_path = Path(output_path_str.replace("{iface}", iface.name))
+                                    iface_path.parent.mkdir(parents=True, exist_ok=True)
+                                    iface_path.write_text(content, encoding="utf-8", newline="\n")
+                    # Regular interface templates
+                    else:
+                        for iface in node.interfaces:
+                            if not iface.configured:
+                                continue
+
+                            # TODO: Make more modular skip
+                            # Skip .link generation for interfaces without MAC or loopback
+                            if template_stem == "interface.link":
+                                if iface.name == "lo" or not iface.mac_address:
+                                    continue
+
+                            iface_context = {**context, "iface": iface}
+                            content = template.render(iface_context)
+                            iface_path = Path(output_path_str.replace("{iface}", iface.name))
+                            iface_path.parent.mkdir(parents=True, exist_ok=True)
+                            iface_path.write_text(content, encoding="utf-8", newline="\n")
+
+                # Per-VLAN templates
+                elif "{vlan}" in output_path_str:
+                    for vlan in node.vlans:
+                        vlan_context = {**context, "vlan": vlan}
+                        content = template.render(vlan_context)
+                        if content.strip():
+                            vlan_path = Path(output_path_str.replace("{vlan}", vlan.name))
+                            vlan_path.parent.mkdir(parents=True, exist_ok=True)
+                            vlan_path.write_text(content, encoding="utf-8", newline="\n")
+
+                # Per-tunnel templates
+                elif "{tunnel}" in output_path_str:
+                    for tunnel in node.tunnels:
+                        tunnel_context = {**context, "tunnel": tunnel}
+                        content = template.render(tunnel_context)
+                        if content.strip():
+                            tunnel_path = Path(output_path_str.replace("{tunnel}", tunnel.name))
+                            tunnel_path.parent.mkdir(parents=True, exist_ok=True)
+                            tunnel_path.write_text(content, encoding="utf-8", newline="\n")
+
+                # Per-bridge templates
+                elif "{bridge}" in output_path_str:
+                    if node.bridge and node.bridge.configured:
+                        bridge_context = {**context}
+                        content = template.render(bridge_context)
+                        if content.strip():
+                            bridge_path = Path(output_path_str.replace("{bridge}", node.bridge.name))
+                            bridge_path.parent.mkdir(parents=True, exist_ok=True)
+                            bridge_path.write_text(content, encoding="utf-8", newline="\n")
+
+                # Regular templates
                 else:
                     content = template.render(context)
                     if content.strip():
@@ -128,10 +204,32 @@ class ConfigController(BaseController["Application"]):
         """Map template stem to output file path."""
 
         path_map = {
+            # networkd templates
             "hostname": outdir / "etc" / "hostname",
+            "interface.link": outdir / "etc" / "systemd" / "network" / "10-{iface}.link",
             "interface.network": outdir / "etc" / "systemd" / "network" / "10-{iface}.network",
             "routes.network": outdir / "etc" / "systemd" / "network" / "20-routes.network",
             "sysctl.conf": outdir / "etc" / "sysctl.d" / "99-netloom.conf",
+            # VLAN templates
+            "vlan.netdev": outdir / "etc" / "systemd" / "network" / "11-{vlan}.netdev",
+            "vlan.network": outdir / "etc" / "systemd" / "network" / "11-{vlan}.network",
+            "vlan-parent.network": outdir / "etc" / "systemd" / "network" / "09-{iface}-vlan.network",
+            # Bridge templates
+            "bridge.netdev": outdir / "etc" / "systemd" / "network" / "05-{bridge}.netdev",
+            "bridge.network": outdir / "etc" / "systemd" / "network" / "06-{bridge}.network",
+            "bridge-port.network": outdir / "etc" / "systemd" / "network" / "07-{iface}-bridge.network",
+            # Tunnel templates
+            "tunnel.netdev": outdir / "etc" / "systemd" / "network" / "25-{tunnel}.netdev",
+            "tunnel.network": outdir / "etc" / "systemd" / "network" / "25-{tunnel}.network",
+            # BIRD templates
+            "bird.conf": outdir / "etc" / "bird" / "bird.conf",
+            "static.conf": outdir / "etc" / "bird" / "conf.d" / "static.conf",
+            "rip.conf": outdir / "etc" / "bird" / "conf.d" / "rip.conf",
+            "ospf.conf": outdir / "etc" / "bird" / "conf.d" / "ospf.conf",
+            # nftables templates
+            "nftables.conf": outdir / "etc" / "nftables.conf",
+            # WireGuard templates
+            "wg0.conf": outdir / "etc" / "wireguard" / "wg0.conf",
         }
         """Mapping of template stems to output paths."""
 

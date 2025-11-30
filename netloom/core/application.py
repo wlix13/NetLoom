@@ -7,8 +7,6 @@ from rich.console import Console
 
 from ..controllers.config import ConfigController
 from ..controllers.infrastructure import InfrastructureController
-from ..controllers.network import NetworkController
-from ..controllers.topology import TopologyController
 
 
 class Application:
@@ -69,14 +67,6 @@ class Application:
         self._debug = value
 
     @property
-    def topology(self) -> TopologyController:
-        """Get topology controller."""
-
-        if "topology" not in self._controllers:
-            self._controllers["topology"] = TopologyController(self)
-        return self._controllers["topology"]
-
-    @property
     def infrastructure(self) -> InfrastructureController:
         """Get infrastructure controller."""
 
@@ -91,11 +81,3 @@ class Application:
         if "config" not in self._controllers:
             self._controllers["config"] = ConfigController(self)
         return self._controllers["config"]
-
-    @property
-    def network(self) -> NetworkController:
-        """Get network controller."""
-
-        if "network" not in self._controllers:
-            self._controllers["network"] = NetworkController(self)
-        return self._controllers["network"]

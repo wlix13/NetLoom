@@ -1,0 +1,15 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Tunnel interface " ~ tunnel.name ~ " on " ~ node.name) }}
+[NetDev]
+Name={{ tunnel.name }}
+{% if tunnel.type == "ipip" -%}
+Kind=ipip
+{% elif tunnel.type == "gre" -%}
+Kind=gre
+{% elif tunnel.type == "sit" -%}
+Kind=sit
+{% endif %}
+
+[Tunnel]
+Local={{ tunnel.local }}
+Remote={{ tunnel.remote }}

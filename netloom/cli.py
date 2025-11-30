@@ -6,10 +6,12 @@ from pathlib import Path
 import click
 import rich_click
 
+from netloom.models.common import load_topology
+from netloom.models.converters import convert_topology
 from netloom.models.internal import InternalTopology
 
 from .core.application import Application
-from .core.paramtypes import DirectoryType, OvaFileType, TemplateSetType, TopologyFileType
+from .core.paramtypes import DirectoryType, OvaFileType, TopologyFileType
 
 
 # Configure rich-click
@@ -91,8 +93,8 @@ def cli(
         snapshot_name=snapshot_name,
     )
 
-    topology = app.topology.load(topo_path)
-    internal = app.topology.convert(topology, workdir=workdir)
+    topology = load_topology(topo_path)
+    internal = convert_topology(topology, workdir=workdir)
 
     Path(workdir).mkdir(parents=True, exist_ok=True)
 
@@ -125,21 +127,33 @@ def create(obj):
 
 
 @cli.command("gen")
-@click.option(
-    "--templates",
-    "template_name",
-    default="networkd",
-    show_default=True,
-    type=TemplateSetType(),
-    help="Template set name, e.g. 'networkd'.",
-)
 @click.pass_obj
-def generate(obj, template_name: str):
-    """Generate configs for all nodes."""
+def generate(obj):
+    """Generate configs for all nodes.
+
+    The primary template set (default: networkd) is always rendered.
+    Additional template sets are automatically rendered based on node configuration:
+
+    \b
+    - bird: when routing.engine is 'bird'
+    - nftables: when services.firewall is configured
+    - wireguard: when services.wireguard is configured
+    """
 
     app: Application = obj["app"]
-    app.config.generate(obj["internal"], template_set=template_name)
-    app.console.print(f"[green]Generated configs using template set: {template_name}[/green]")
+    internal: InternalTopology = obj["internal"]
+    app.config.generate(internal)
+
+    templates_rendered = {"networkd"}
+    for node in internal.nodes:
+        if node.routing and node.routing.engine == "bird" and node.routing.configured:
+            templates_rendered.add("bird")
+        if node.services and node.services.firewall:
+            templates_rendered.add("nftables")
+        if node.services and node.services.wireguard:
+            templates_rendered.add("wireguard")
+
+    app.console.print(f"[green]Auto-rendered templates: {', '.join(sorted(templates_rendered))}[/green]")
 
 
 @cli.command()
@@ -228,7 +242,7 @@ def list_templates(obj):
     "--routing",
     "-r",
     is_flag=True,
-    help="Show routing config",
+    help="Show routing config (static, OSPF, RIP)",
 )
 @click.option(
     "--services",
@@ -241,6 +255,18 @@ def list_templates(obj):
     "-b",
     is_flag=True,
     help="Show bridge config",
+)
+@click.option(
+    "--vlans",
+    "-v",
+    is_flag=True,
+    help="Show VLAN config",
+)
+@click.option(
+    "--tunnels",
+    "-t",
+    is_flag=True,
+    help="Show tunnel config",
 )
 @click.option(
     "--sysctl",
@@ -261,6 +287,8 @@ def show_topology(
     routing: bool,
     services: bool,
     bridges: bool,
+    vlans: bool,
+    tunnels: bool,
     sysctl: bool,
     show_all: bool,
 ):
@@ -281,7 +309,8 @@ def show_topology(
         for iface in node.interfaces:
             peer = f" -> {iface.peer_node}" if iface.peer_node else ""
             ip = f" [{iface.ip}]" if iface.ip else ""
-            app.console.print(f"    {iface.name}{ip}{peer}")
+            mac = f" ({iface.mac_address})" if iface.mac_address else ""
+            app.console.print(f"    {iface.name}{ip}{mac}{peer}")
 
         # routing section
         if (routing or show_all) and node.routing:
@@ -303,6 +332,27 @@ def show_topology(
                 for area in node.routing.ospf_areas:
                     interfaces_str = ", ".join(area.interfaces) if area.interfaces else "none"
                     app.console.print(f"      OSPF area {area.id}: {interfaces_str}")
+
+            # rip
+            if node.routing.rip and node.routing.rip.enabled:
+                rip = node.routing.rip
+                interfaces_str = ", ".join(rip.interfaces) if rip.interfaces else "none"
+                app.console.print(f"      RIP v{rip.version}: {interfaces_str}")
+
+        # vlans section
+        if (vlans or show_all) and node.vlans:
+            app.console.print("    [magenta]VLANs:[/magenta]")
+            for vlan in node.vlans:
+                ip_str = f" [{vlan.ip}]" if vlan.ip else ""
+                gw_str = f" gw {vlan.gateway}" if vlan.gateway else ""
+                app.console.print(f"      {vlan.name} (id={vlan.id}, parent={vlan.parent}){ip_str}{gw_str}")
+
+        # tunnels section
+        if (tunnels or show_all) and node.tunnels:
+            app.console.print("    [cyan]Tunnels:[/cyan]")
+            for tunnel in node.tunnels:
+                ip_str = f" [{tunnel.ip}]" if tunnel.ip else ""
+                app.console.print(f"      {tunnel.name} ({tunnel.type}): {tunnel.local} -> {tunnel.remote}{ip_str}")
 
         # services section
         if (services or show_all) and node.services:

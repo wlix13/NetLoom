@@ -1,0 +1,11 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Parent interface configuration with VLANs for " ~ iface.name ~ " on " ~ node.name) }}
+[Match]
+Name={{ iface.name }}
+
+[Network]
+{% for vlan in node.vlans -%}
+{% if vlan.parent == iface.name -%}
+VLAN={{ vlan.name }}
+{% endif -%}
+{% endfor %}
