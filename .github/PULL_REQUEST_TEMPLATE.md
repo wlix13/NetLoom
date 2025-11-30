@@ -55,6 +55,12 @@
 - [ ] Tests pass locally
 - [ ] Documentation updated (if needed)
 
+### Version Bumping
+
+- [ ] Version bumped in `__init__.py`
+- [ ] Version bumped in `pyproject.toml`
+- [ ] Version bumped in `uv.lock`
+
 ---
 
 <!-- OPTIONAL: Remove sections that don't apply -->
