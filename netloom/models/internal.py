@@ -41,7 +41,7 @@ class InternalResources(BaseModel):
     cpu: int = 1
     """CPU count."""
 
-    ram_mb: int = 128
+    ram_mb: int = 512
     """RAM in MB."""
 
     disk_gb: int = 8
@@ -99,6 +99,44 @@ class InternalStaticRoute(BaseModel):
     """Next-hop gateway IP."""
 
 
+class InternalVLAN(BaseModel):
+    """Internal representation of a VLAN interface."""
+
+    id: int
+    """VLAN ID (1-4094)."""
+
+    parent: str
+    """Parent interface name (e.g., eth1)."""
+
+    name: str
+    """VLAN interface name (e.g., eth1.100)."""
+
+    ip: str | None = None
+    """IP address in CIDR notation."""
+
+    gateway: str | None = None
+    """Gateway IP address."""
+
+
+class InternalTunnel(BaseModel):
+    """Internal representation of an IP tunnel."""
+
+    name: str
+    """Tunnel interface name."""
+
+    type: Literal["ipip", "gre", "sit"]
+    """Tunnel type."""
+
+    local: str
+    """Local endpoint IP address."""
+
+    remote: str
+    """Remote endpoint IP address."""
+
+    ip: str | None = None
+    """IP address in CIDR notation for the tunnel interface."""
+
+
 class InternalOSPFArea(BaseModel):
     """Internal OSPF area configuration."""
 
@@ -107,6 +145,19 @@ class InternalOSPFArea(BaseModel):
 
     interfaces: list[str] = Field(default_factory=list)
     """Interfaces in this area."""
+
+
+class InternalRIP(BaseModel):
+    """Internal RIP routing configuration."""
+
+    enabled: bool = False
+    """RIP enabled."""
+
+    version: Literal[1, 2] = 2
+    """RIP version."""
+
+    interfaces: list[str] = Field(default_factory=list)
+    """Interfaces participating in RIP."""
 
 
 class InternalRouting(BaseModel):
@@ -126,6 +177,9 @@ class InternalRouting(BaseModel):
 
     ospf_areas: list[InternalOSPFArea] = Field(default_factory=list)
     """OSPF areas."""
+
+    rip: InternalRIP | None = None
+    """RIP configuration."""
 
     configured: bool = True
     """Whether to generate config for this routing."""
@@ -235,6 +289,12 @@ class InternalNode(BaseModel):
 
     interfaces: list[InternalInterface] = Field(default_factory=list)
     """Network interfaces."""
+
+    vlans: list[InternalVLAN] = Field(default_factory=list)
+    """VLAN interfaces."""
+
+    tunnels: list[InternalTunnel] = Field(default_factory=list)
+    """IP tunnels."""
 
     bridge: InternalBridge | None = None
     """Bridge configuration."""

@@ -3,11 +3,23 @@
 {% if node.interfaces|selectattr('configured')|list -%}
 + systemd-networkd
 {% endif -%}
-{% if node.routing and node.routing.ospf_enabled -%}
+{% if node.bridge and node.bridge.configured -%}
++ systemd-networkd
+{% endif -%}
+{% if node.vlans -%}
++ systemd-networkd
+{% endif -%}
+{% if node.tunnels -%}
++ systemd-networkd
+{% endif -%}
+{% if node.routing and node.routing.configured -%}
+{% set has_routing = node.routing.ospf_enabled or (node.routing.rip and node.routing.rip.enabled) or node.routing.static_routes -%}
+{% if has_routing -%}
 {% if node.routing.engine == 'frr' -%}
 + frr
 {% elif node.routing.engine == 'bird' -%}
 + bird
+{% endif -%}
 {% endif -%}
 {% endif -%}
 {% if node.services and node.services.firewall -%}

@@ -1,0 +1,24 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.routing and node.routing.rip and node.routing.rip.enabled -%}
+{{ macros.comment("RIP routing configuration for " ~ node.name) }}
+
+protocol rip rip_v{{ node.routing.rip.version }} {
+    ipv4 {
+        import all;
+        export all;
+    };
+
+{% if node.routing.rip.version == 2 -%}
+    # RIPv2 supports authentication and CIDR
+{% endif -%}
+
+{% for iface in node.routing.rip.interfaces -%}
+    interface "{{ iface }}" {
+        mode multicast;
+        update time 30;
+        timeout time 180;
+        garbage time 120;
+    };
+{% endfor -%}
+}
+{% endif %}

@@ -103,6 +103,64 @@
               }
             }
           },
+          "vlans": {
+            "type": "array",
+            "description": "VLAN (802.1Q) interface configurations.",
+            "items": {
+              "type": "object",
+              "required": ["id", "parent"],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4094,
+                  "description": "VLAN ID (1-4094)"
+                },
+                "parent": {
+                  "type": "string",
+                  "description": "Parent interface name (e.g., eth1)"
+                },
+                "ip": {
+                  "type": "string",
+                  "description": "IP address in CIDR notation"
+                },
+                "gateway": { "type": "string" }
+              }
+            }
+          },
+          "tunnels": {
+            "type": "array",
+            "description": "IP tunnel configurations (IPIP, GRE, SIT).",
+            "items": {
+              "type": "object",
+              "required": ["local", "remote"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "default": "tun0",
+                  "description": "Tunnel interface name"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["ipip", "gre", "sit"],
+                  "default": "ipip",
+                  "description": "Tunnel type"
+                },
+                "local": {
+                  "type": "string",
+                  "description": "Local endpoint IP address"
+                },
+                "remote": {
+                  "type": "string",
+                  "description": "Remote endpoint IP address"
+                },
+                "ip": {
+                  "type": "string",
+                  "description": "IP address in CIDR notation for the tunnel interface"
+                }
+              }
+            }
+          },
           "bridge": {
             "type": "object",
             "properties": {
@@ -136,6 +194,24 @@
                         }
                       }
                     }
+                  }
+                }
+              },
+              "rip": {
+                "type": "object",
+                "description": "RIP routing configuration.",
+                "properties": {
+                  "enabled": { "type": "boolean", "default": false },
+                  "version": {
+                    "type": "integer",
+                    "enum": [1, 2],
+                    "default": 2,
+                    "description": "RIP version (1 or 2)"
+                  },
+                  "interfaces": {
+                    "type": "array",
+                    "description": "Interfaces participating in RIP",
+                    "items": { "type": "string" }
                   }
                 }
               },

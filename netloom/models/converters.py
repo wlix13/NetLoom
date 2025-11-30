@@ -17,12 +17,15 @@ from .internal import (
     InternalLink,
     InternalNode,
     InternalOSPFArea,
+    InternalRIP,
     InternalRouting,
     InternalServices,
     InternalStaticRoute,
     InternalSysctl,
     InternalTopology,
+    InternalTunnel,
     InternalVBoxSettings,
+    InternalVLAN,
     InternalWireguard,
     InternalWireguardPeer,
     ifname_to_vbox_adapter_index,
@@ -127,7 +130,15 @@ class TopologyConverter:
                             interfaces=area.interfaces or [],
                         )
                     )
-        # NOTE: New routing engine support will be added later.
+
+        # Convert RIP configuration
+        rip = None
+        if routing.rip and routing.rip.enabled:
+            rip = InternalRIP(
+                enabled=routing.rip.enabled,
+                version=routing.rip.version,
+                interfaces=routing.rip.interfaces or [],
+            )
 
         return InternalRouting(
             engine=routing.engine,
@@ -135,8 +146,47 @@ class TopologyConverter:
             static_routes=static_routes,
             ospf_enabled=ospf_enabled,
             ospf_areas=ospf_areas,
+            rip=rip,
             configured=routing.configured,
         )
+
+    def _convert_vlans(self, node: Node) -> list[InternalVLAN]:
+        """Convert VLAN configs to internal format."""
+
+        if not node.vlans:
+            return []
+
+        vlans: list[InternalVLAN] = []
+        for vlan in node.vlans:
+            vlans.append(
+                InternalVLAN(
+                    id=vlan.id,
+                    parent=vlan.parent,
+                    name=f"{vlan.parent}.{vlan.id}",
+                    ip=vlan.ip,
+                    gateway=vlan.gateway,
+                )
+            )
+        return vlans
+
+    def _convert_tunnels(self, node: Node) -> list[InternalTunnel]:
+        """Convert tunnel configs to internal format."""
+
+        if not node.tunnels:
+            return []
+
+        tunnels: list[InternalTunnel] = []
+        for tunnel in node.tunnels:
+            tunnels.append(
+                InternalTunnel(
+                    name=tunnel.name,
+                    type=tunnel.type,
+                    local=tunnel.local,
+                    remote=tunnel.remote,
+                    ip=tunnel.ip,
+                )
+            )
+        return tunnels
 
     def _convert_services(self, node: Node) -> InternalServices | None:
         """Convert services config to internal format."""
@@ -284,6 +334,8 @@ class TopologyConverter:
                 name=node.name,
                 role=node.role,
                 interfaces=interfaces,
+                vlans=self._convert_vlans(node),
+                tunnels=self._convert_tunnels(node),
                 bridge=self._convert_bridge(node, interfaces),
                 sysctl=self._convert_sysctl(node),
                 routing=self._convert_routing(node),

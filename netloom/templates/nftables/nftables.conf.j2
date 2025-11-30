@@ -1,0 +1,68 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.services and node.services.firewall -%}
+{{ macros.section_header("nftables firewall configuration for " ~ node.name) }}
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Allow established and related connections
+        ct state established,related accept
+
+        # Allow loopback
+        iif "lo" accept
+
+        # Allow ICMP (ping)
+        ip protocol icmp accept
+        ip6 nexthdr icmpv6 accept
+
+{% for rule in node.services.firewall.rules -%}
+{% if rule.action == "accept" -%}
+{% if rule.proto and rule.dport -%}
+        # Accept {{ rule.proto }} port {{ rule.dport }}
+        {{ rule.proto }} dport {{ rule.dport }}{% if rule.src %} ip saddr {{ rule.src }}{% endif %}{% if rule.dst %} ip daddr {{ rule.dst }}{% endif %} accept
+{% elif rule.proto == "icmp" -%}
+        # Accept ICMP
+        ip protocol icmp accept
+{% elif rule.src or rule.dst -%}
+        # Accept traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
+
+{% if rule.src %}        ip saddr {{ rule.src }}{% endif %}{% if rule.dst %} ip daddr {{ rule.dst }}{% endif %} accept
+{% endif -%}
+{% elif rule.action == "drop" -%}
+{% if rule.src == "0.0.0.0/0" -%}
+        # Drop all other traffic (default drop policy handles this)
+{% elif rule.src or rule.dst -%}
+        # Drop traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
+
+{% if rule.src %}        ip saddr {{ rule.src }}{% endif %}{% if rule.dst %} ip daddr {{ rule.dst }}{% endif %} drop
+{% endif -%}
+{% elif rule.action == "reject" -%}
+        # Reject traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
+{% if rule.proto and rule.dport -%}
+        {{ rule.proto }} dport {{ rule.dport }}{% if rule.src %} ip saddr {{ rule.src }}{% endif %}{% if rule.dst %} ip daddr {{ rule.dst }}{% endif %} reject
+{% elif rule.src or rule.dst -%}
+{% if rule.src %}        ip saddr {{ rule.src }}{% endif %}{% if rule.dst %} ip daddr {{ rule.dst }}{% endif %} reject
+{% endif -%}
+{% endif -%}
+{% endfor -%}
+
+        # Log and drop everything else
+        log prefix "nftables-dropped: " drop
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Allow established and related connections
+        ct state established,related accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+{% endif %}

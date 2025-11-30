@@ -1,0 +1,24 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.services and node.services.wireguard -%}
+{{ macros.comment("WireGuard VPN configuration for " ~ node.name) }}
+
+[Interface]
+PrivateKey = {{ node.services.wireguard.private_key }}
+{% if node.services.wireguard.address -%}
+Address = {{ node.services.wireguard.address }}
+{% endif -%}
+{% if node.services.wireguard.listen_port -%}
+ListenPort = {{ node.services.wireguard.listen_port }}
+{% endif %}
+
+{% for peer in node.services.wireguard.peers -%}
+[Peer]
+PublicKey = {{ peer.public_key }}
+AllowedIPs = {{ peer.allowed_ips }}
+{% if peer.endpoint -%}
+Endpoint = {{ peer.endpoint }}
+{% endif -%}
+PersistentKeepalive = 25
+
+{% endfor -%}
+{% endif %}

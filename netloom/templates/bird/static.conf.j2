@@ -1,0 +1,12 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.routing and node.routing.static_routes -%}
+{{ macros.comment("Static routes configuration for " ~ node.name) }}
+
+protocol static static_routes {
+    ipv4;
+
+{% for route in node.routing.static_routes -%}
+    route {{ route.destination }} via {{ route.gateway }};
+{% endfor -%}
+}
+{% endif %}
