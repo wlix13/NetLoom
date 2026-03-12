@@ -316,8 +316,8 @@ def show_topology(
             if node.services.wireguard:
                 wg = node.services.wireguard
                 app.console.print(f"      WireGuard: {wg.address} :{wg.listen_port}")
-                for peer in wg.peers:  # type: ignore[assignment]
-                    app.console.print(f"        Peer: {peer.public_key[:8]}... -> {peer.allowed_ips}")  # type: ignore[attr-defined]
+                for peer in wg.peers:
+                    app.console.print(f"        Peer: {peer.public_key[:8]}... -> {peer.allowed_ips}")
 
             # firewall
             if node.services.firewall:
@@ -326,9 +326,9 @@ def show_topology(
                 for rule in fw.rules:
                     rule_parts: list[str] = []
                     if rule.action:
-                        rule_parts.append(rule.action)  # type: ignore[arg-type]
+                        rule_parts.append(rule.action)
                     if rule.proto:
-                        rule_parts.append(rule.proto)  # type: ignore[arg-type]
+                        rule_parts.append(rule.proto)
                     if rule.src:
                         rule_parts.append(f"src {rule.src}")
                     if rule.dst:

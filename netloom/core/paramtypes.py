@@ -1,13 +1,9 @@
 """Custom Click paramtypes with shell completion support."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import click
-
-
-if TYPE_CHECKING:
-    from click.shell_completion import CompletionItem
+from click.shell_completion import CompletionItem
 
 
 class TopologyFileType(click.ParamType):
@@ -28,9 +24,9 @@ class TopologyFileType(click.ParamType):
                     name = item.name
                     if incomplete and not name.startswith(Path(incomplete).name):
                         continue
-                    completions.append(click.shell_completion.CompletionItem(name))
+                    completions.append(CompletionItem(name))
                 elif item.is_dir() and (not incomplete or item.name.startswith(Path(incomplete).name)):
-                    completions.append(click.shell_completion.CompletionItem(f"{item.name}/"))
+                    completions.append(CompletionItem(f"{item.name}/"))
         except PermissionError:
             pass
 
@@ -67,9 +63,9 @@ class OvaFileType(click.ParamType):
                     name = item.name
                     if incomplete and not name.startswith(Path(incomplete).name):
                         continue
-                    completions.append(click.shell_completion.CompletionItem(name))
+                    completions.append(CompletionItem(name))
                 elif item.is_dir() and (not incomplete or item.name.startswith(Path(incomplete).name)):
-                    completions.append(click.shell_completion.CompletionItem(f"{item.name}/"))
+                    completions.append(CompletionItem(f"{item.name}/"))
         except PermissionError:
             pass
 
@@ -110,7 +106,7 @@ class DirectoryType(click.ParamType):
                     name = item.name
                     if incomplete and not name.startswith(Path(incomplete).name):
                         continue
-                    completions.append(click.shell_completion.CompletionItem(f"{name}/"))
+                    completions.append(CompletionItem(f"{name}/"))
         except PermissionError:
             pass
 
@@ -137,7 +133,7 @@ class TemplateSetType(click.ParamType):
             if ctx and ctx.obj and "app" in ctx.obj:
                 app = ctx.obj["app"]
                 templates = app.config.list_template_sets()
-                return [click.shell_completion.CompletionItem(tpl) for tpl in templates if tpl.startswith(incomplete)]
+                return [CompletionItem(tpl) for tpl in templates if tpl.startswith(incomplete)]
         except Exception:  # noqa: S110
             pass
 
@@ -146,7 +142,7 @@ class TemplateSetType(click.ParamType):
 
             app = Application.current()
             templates = app.config.list_template_sets()
-            return [click.shell_completion.CompletionItem(tpl) for tpl in templates if tpl.startswith(incomplete)]
+            return [CompletionItem(tpl) for tpl in templates if tpl.startswith(incomplete)]
         except Exception:  # noqa: S110
             return []
 
@@ -179,7 +175,7 @@ class NodeNameType(click.ParamType):
             if ctx and ctx.obj and "internal" in ctx.obj:
                 internal = ctx.obj["internal"]
                 nodes = [node.name for node in internal.nodes]
-                return [click.shell_completion.CompletionItem(name) for name in nodes if name.startswith(incomplete)]
+                return [CompletionItem(name) for name in nodes if name.startswith(incomplete)]
         except Exception:  # noqa: S110
             pass
 

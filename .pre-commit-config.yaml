@@ -3,24 +3,9 @@ default_install_hook_types:
   - post-checkout
   - post-merge
   - post-rewrite
-default_language_version:
-  python: python3.13
 repos:
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
-    hooks:
-      - id: mypy
-        args: [--explicit-package-bases, --namespace-packages]
-        additional_dependencies:
-          - types-pyyaml
-          - types-jinja2
-          - types-orjson
-          - pydantic
-          - rich-click
-          - fattools
-
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.11.1
+    rev: v2.18.1
     hooks:
       - id: pyproject-fmt
 
@@ -39,13 +24,13 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.9.13
+    rev: 0.10.9
     hooks:
       - id: uv-lock
       - id: uv-sync
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.14.7
+    rev: v0.15.5
     hooks:
       - id: ruff-check
         args: [--fix]
