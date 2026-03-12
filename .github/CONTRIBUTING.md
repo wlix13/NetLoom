@@ -59,18 +59,18 @@ Alternatively, if you want a very quick and easy method, you can install it as f
 pip install -U uv
 ```
 
-### Pre-commit Hooks
+### Pre-commit Hooks (via prek)
 
-This project uses pre-commit hooks to ensure code quality and consistency. Before making any commits, please install and set up pre-commit:
+This project uses pre-commit hooks to ensure code quality and consistency. Before making any commits, please install and set up prek:
 
 ```bash
-# Install pre-commit (if not already installed)
-uv tool install pre-commit
+# Install prek (if not already installed)
+uv tool install prek
 # or use with uv run (as dev environment already has it covered)
-uv run pre-commit
+uv run prek
 
 # Install the pre-commit hooks
-pre-commit install
+prek install
 ```
 
 The pre-commit hooks will automatically run on each commit to check for:
@@ -81,7 +81,7 @@ The pre-commit hooks will automatically run on each commit to check for:
 If any hooks fail, please fix the issues before committing. You can manually run all hooks with:
 
 ```bash
-pre-commit run --all-files
+prek run --all-files
 ```
 
 ## Commits
