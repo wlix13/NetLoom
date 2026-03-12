@@ -44,19 +44,23 @@ meta:
   name: "My First Network Lab"
   description: "A simple two-router topology"
 
-links:
-  - endpoints: ["R1", "R2"]
+networks:
+  - name: r1-r2
 
 nodes:
   - name: R1
     role: router
     interfaces:
-      - ip: "10.0.1.1/24"
+      uplink:
+        network: r1-r2
+        ip: "10.0.1.1/24"
 
   - name: R2
     role: router
     interfaces:
-      - ip: "10.0.1.2/24"
+      uplink:
+        network: r1-r2
+        ip: "10.0.1.2/24"
 ```
 
 ### 2. Initialize the Environment

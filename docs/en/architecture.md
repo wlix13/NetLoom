@@ -8,22 +8,21 @@ NetLoom follows a **controller-based architecture** with a singleton Application
 
 ```mermaid
 flowchart TB
-    subgraph CLI["CLI Layer (cli.py)"]
-        commands[Commands: init, create, gen, attach, start, stop, destroy]
+    subgraph CLI["CLI Package (netloom/cli/)"]
+        group["_group.py\n(load + convert topology)"]
+        cmds["infra.py · lifecycle.py\nmanage.py · show.py"]
     end
 
     subgraph App["Application (core/application.py)"]
         direction LR
-        TC[Topology<br/>Controller]
-        IC[Infrastructure<br/>Controller]
-        CC[Config<br/>Controller]
-        NC[Network<br/>Controller]
+        IC[Infrastructure\nController]
+        CC[Config\nController]
     end
 
     subgraph External["External Systems"]
         direction LR
-        VBox[VirtualBox<br/>VBoxManage]
-        Jinja[Jinja2<br/>Templates]
+        VBox[VirtualBox\nVBoxManage]
+        Jinja[Jinja2\nTemplates]
     end
 
     CLI --> App
@@ -38,48 +37,31 @@ The `Application` class (`netloom/core/application.py`) is the central singleton
 
 - Manages controller instances (lazy initialization)
 - Provides a shared `Console` for Rich terminal output
-- Tracks workdir and debug state
+- Tracks `workdir`, `debug` state, and `vbox_settings`
 
 ```python
 app = Application.current()
-app.topology.load("lab.yaml")
 app.infrastructure.create(internal)
+app.config.generate(internal)
 ```
 
-Controllers are accessed as properties and created on first access.
+Controllers are accessed as properties and created on first access. They must never import each other at module level - siblings are accessed via `self.app.other_controller` inside methods.
 
 ### Controllers
-
-#### TopologyController
-
-**Location:** `netloom/controllers/topology.py`
-
-Handles topology loading and conversion:
-
-| Method                       | Description                                          |
-| ---------------------------- | ---------------------------------------------------- |
-| `load(path)`                 | Load and validate a YAML topology file               |
-| `convert(topology, workdir)` | Convert external topology to internal representation |
-
-The internal representation adds computed fields like interface names, peer relationships, and merged sysctl settings.
 
 #### InfrastructureController
 
 **Location:** `netloom/controllers/infrastructure.py`
 
-Manages VirtualBox VM lifecycle:
+Manages VirtualBox VM lifecycle via `VBoxManage`:
 
-| Method                            | Description                                          |
-| --------------------------------- | ---------------------------------------------------- |
-| `configure(...)`                  | Set VirtualBox settings (basefolder, OVA path, etc.) |
-| `init(internal, workdir)`         | Import OVA and create golden snapshot                |
-| `create(internal)`                | Create linked clones with config-drives              |
-| `start(internal)`                 | Start all VMs                                        |
-| `stop(internal)`                  | Stop all VMs (ACPI shutdown)                         |
-| `destroy(internal, destroy_base)` | Remove VMs (hard shutdown)                           |
-| `get_configdrive(node_name)`      | Get config-drive path for a node                     |
-
-Internally uses `VBoxManage` commands for VM operations.
+| Method                            | Description                                  |
+| --------------------------------- | -------------------------------------------- |
+| `init(internal, workdir)`         | Import OVA and create golden snapshot        |
+| `create(internal)`                | Create linked clones with config-drives      |
+| `start(internal)`                 | Start all VMs                                |
+| `stop(internal)`                  | Stop all VMs (ACPI shutdown)                 |
+| `destroy(internal, destroy_base)` | Remove VMs (hard shutdown + unregister)      |
 
 #### ConfigController
 
@@ -87,97 +69,126 @@ Internally uses `VBoxManage` commands for VM operations.
 
 Handles configuration generation and deployment:
 
-| Method                             | Description                      |
-| ---------------------------------- | -------------------------------- |
-| `list_template_sets()`             | List available template sets     |
-| `generate(internal, template_set)` | Generate configs using templates |
-| `attach(internal)`                 | Copy configs to VM config-drives |
-| `save(internal)`                   | Pull configs from VMs to host    |
-| `restore(internal)`                | Restore saved configs to staging |
+| Method                   | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `list_template_sets()`   | List available template sets                       |
+| `generate(internal)`     | Render Jinja2 templates; auto-detects sets per node|
+| `attach(internal)`       | Copy configs to VM config-drives                   |
+| `save(internal)`         | Pull configs from config-drives to host            |
+| `restore(internal)`      | Restore saved configs to staging area              |
 
-#### NetworkController
+`generate()` always renders the `networkd` set and auto-detects additional sets per node:
 
-**Location:** `netloom/controllers/network.py`
-
-Network-related utilities and calculations.
+- `bird` — when `routing.engine` is `bird`
+- `nftables` — when `services.firewall` is configured
+- `wireguard` — when `services.wireguard` is configured
 
 ## Data Flow
 
 ### 1. Topology Loading
 
-```
-YAML File → TopologyController.load() → ExternalTopology (Pydantic Model)
-                                             │
-                                             ▼
-                    TopologyController.convert() → InternalTopology
+```text
+YAML File → load_topology() → Topology (Pydantic, mirrors YAML schema)
+                                    │
+                                    ▼
+              convert_topology() → InternalTopology (runtime representation)
 ```
 
-The external `Topology` model mirrors the YAML schema. The internal representation adds:
+Both functions are called in the CLI group (`netloom/cli/_group.py`) before dispatching to any subcommand. The result is stored in `ctx.obj["internal"]`.
 
-- Computed interface names (eth1, eth2, ...)
+The conversion adds:
+
+- Deterministic MAC addresses per interface (seeded from `<topo-id>-<node>-<iface>`)
+- VirtualBox NIC index allocation per node
 - Peer node relationships
 - Merged sysctl settings (defaults + node-specific)
 - Resolved service configurations
 
 ### 2. Configuration Generation
 
-```
+```text
 InternalTopology → ConfigController.generate()
                           │
-                          ├─→ Jinja2 Environment
-                          │       │
-                          │       ▼
-                          │   Template Sets (networkd/, services/)
-                          │       │
-                          │       ▼
-                          └─→ Generated Files (workdir/configs/<node>/)
+                          ├─→ networkd/     (always)
+                          ├─→ bird/         (if routing.engine == bird)
+                          ├─→ nftables/     (if services.firewall set)
+                          └─→ wireguard/    (if services.wireguard set)
+                                  │
+                                  ▼
+                     workdir/configs/<node>/etc/...
 ```
 
 ### 3. VM Deployment
 
-```
+```text
 InternalTopology → InfrastructureController.create()
                           │
-                          ├─→ VBoxManage clonevm (linked clone)
-                          ├─→ VBoxManage createmedium (config-drive)
-                          └─→ VBoxManage modifyvm (NICs, hardware)
+                          ├─→ VBoxManage clonevm   (linked clone per node)
+                          ├─→ VBoxManage createmedium  (config-drive VMDK)
+                          └─→ VBoxManage modifyvm   (NICs → internal networks)
 ```
 
 ## Models
 
 ### External Models (`netloom/models/config.py`)
 
-Pydantic models that match the YAML schema:
+Pydantic models that match the YAML schema exactly:
 
-- `Topology` - Root model
-- `Meta` - Topology metadata
-- `Defaults` - Global defaults
-- `Link` - Node connections
-- `Node` - Node configuration
-- `InterfaceConfig`, `BridgeConfig`, `RoutingConfig`, etc.
+- `Topology` — root model (`meta`, `networks`, `nodes`, `defaults`)
+- `Meta` — topology metadata
+- `Defaults` — global defaults (`ip_forwarding`, `sysctl`, `vbox`)
+- `Network` — named L2 network segment
+- `Node` — node configuration
+- `InterfaceConfig` — named interface (dict value in `node.interfaces`)
+- `VLANConfig`, `TunnelConfig`, `BridgeConfig`
+- `StaticRoute` — `{destination, gateway}` object
+- `RoutingConfig`, `OSPFConfig`, `RIPConfig`
+- `ServicesConfig`, `WireguardConfig`, `FirewallConfig`
 
 ### Internal Models (`netloom/models/internal.py`)
 
-Runtime representations with computed fields:
+Runtime representations with computed and enriched fields:
 
-- `InternalTopology` - Enriched topology
-- `InternalNode` - Node with resolved interfaces
-- `InternalInterface` - Interface with peer info
-- `InternalLink` - Link with interface references
+- `InternalTopology` — full topology with node/link indexes
+- `InternalNode` — node with resolved interfaces, computed config dirs
+- `InternalInterface` — interface with `mac_address`, `vbox_nic_index`, `peer_node`, `network`
+- `InternalNetwork` — L2 segment with VirtualBox network name and participant list
+- `InternalLink` — point-to-point connection (subset of networks with exactly 2 participants)
+- `InternalBridge`, `InternalVLAN`, `InternalTunnel`
+- `InternalRouting`, `InternalServices`, `InternalSysctl`
+- `InternalVBoxSettings` — per-node or topology-level VirtualBox settings
 
 ## Template System
 
-Templates are organized in `netloom/templates/`:
+Templates live in `netloom/templates/` organized by technology:
 
-```
+```bash
 templates/
 ├── _base/
-│   └── _macros.j2       # Shared Jinja2 macros
-├── networkd/            # systemd-networkd templates
+│   └── _macros.j2            # Shared Jinja2 macros
+├── networkd/                 # systemd-networkd (always rendered)
 │   ├── hostname.j2
+│   ├── interface.link.j2     # MAC-based interface rename rule
 │   ├── interface.network.j2
+│   ├── bridge.netdev.j2
+│   ├── bridge.network.j2
+│   ├── bridge-port.network.j2
+│   ├── vlan.netdev.j2
+│   ├── vlan.network.j2
+│   ├── vlan-parent.network.j2
+│   ├── tunnel.netdev.j2
+│   ├── tunnel.network.j2
 │   ├── routes.network.j2
 │   └── sysctl.conf.j2
+├── bird/                     # BIRD routing daemon
+│   ├── bird.conf.j2
+│   ├── ospf.conf.j2
+│   ├── rip.conf.j2
+│   └── static.conf.j2
+├── nftables/                 # nftables firewall
+│   └── nftables.conf.j2
+├── wireguard/                # WireGuard VPN
+│   └── wg0.conf.j2
 └── services/
     └── services.list.j2
 ```
@@ -186,23 +197,26 @@ templates/
 
 Each template receives:
 
-- `node` - The internal node model
-- `topology` - The full internal topology
-- Global macros from `_base/_macros.j2`
+- `node` — `InternalNode` for the node being configured
+- `topology` — the full `InternalTopology`
+- `iface` — `InternalInterface` (for per-interface templates)
 
-### Output Mapping
+### Output Path Mapping
 
-Template filenames determine output paths:
+Template filenames determine output paths (resolved by `ConfigController._OUTPUT_PATHS`):
 
-| Template               | Output                                |
-| ---------------------- | ------------------------------------- |
-| `hostname.j2`          | `etc/hostname`                        |
-| `interface.network.j2` | `etc/systemd/network/<iface>.network` |
-| `sysctl.conf.j2`       | `etc/sysctl.d/99-netloom.conf`        |
+| Template pattern    | Output path                               |
+| ------------------- | ----------------------------------------- |
+| `hostname.j2`       | `etc/hostname`                            |
+| `*.network.j2`      | `etc/systemd/network/<name>.network`      |
+| `*.netdev.j2`       | `etc/systemd/network/<name>.netdev`       |
+| `*.link.j2`         | `etc/systemd/network/<name>.link`         |
+| `sysctl.conf.j2`    | `etc/sysctl.d/99-netloom.conf`            |
+| `*.conf.j2`         | `etc/<name>.conf`                         |
 
 ## VirtualBox Integration
 
-NetLoom uses `VBoxManage` CLI for all VM operations:
+NetLoom uses `VBoxManage` CLI for all VM operations.
 
 ### Linked Clones
 
@@ -232,31 +246,31 @@ The config-drive contains network configurations that the VM applies on boot.
 
 ### Internal Networks
 
-Links are implemented as VirtualBox internal networks:
+Networks are implemented as VirtualBox internal networks named `<topology-id>_<network-name>`:
 
 ```bash
-VBoxManage modifyvm "R1" --nic2 intnet --intnet2 "lab-R1-R2"
+VBoxManage modifyvm "R1" --nic2 intnet --intnet2 "my-lab_r1-r2"
 ```
 
-Each link gets a unique internal network name ensuring isolation.
+All interfaces on different nodes that share the same `network` name in the YAML are connected to the same VirtualBox internal network, acting as a virtual L2 switch.
 
 ## Extension Points
 
 ### Custom Template Sets
 
-Create a new directory in `templates/` with your templates:
+Create a new directory in `netloom/templates/` with your templates:
 
-```
-templates/
+```bash
+netloom/templates/
 └── my-templates/
     ├── custom.conf.j2
     └── ...
 ```
 
-Use with: `netloom --topology lab.yaml gen --templates my-templates`
+Then register it in `ConfigController._get_output_path` and add a `_render_template_set` call in `ConfigController.generate`.
 
 ### Adding Controllers
 
-1. Create a new controller class inheriting from `BaseController`
-2. Add a property in `Application` class
-3. Wire up CLI commands in `cli.py`
+1. Create a new class inheriting from `BaseController` (`netloom/core/controller.py`)
+2. Add a `@cached_property` in `Application` returning the new controller
+3. Add CLI commands in the appropriate module under `netloom/cli/`
