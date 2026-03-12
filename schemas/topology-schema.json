@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://asvk.topology/schema/3.0",
-  "title": "ASVK Structured Topology (No-Files/No-Packages)",
+  "title": "ASVK Structured Topology",
   "type": "object",
-  "required": ["meta", "links", "nodes"],
+  "required": ["meta", "networks", "nodes"],
   "properties": {
     "meta": {
       "type": "object",
@@ -52,18 +52,16 @@
         }
       }
     },
-    "links": {
+    "networks": {
       "type": "array",
-      "description": "Physical connections. Tool maps these sequentially to eth1, eth2, etc.",
+      "description": "L2 networks, which are mapped to VirtualBox internal networks.",
       "items": {
         "type": "object",
-        "required": ["endpoints"],
+        "required": ["name"],
         "properties": {
-          "endpoints": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": { "type": "string" }
+          "name": {
+            "type": "string",
+            "description": "Unique name of the L2 network."
           }
         }
       }
@@ -85,30 +83,139 @@
             "description": "Node-specific kernel parameters."
           },
           "interfaces": {
+            "type": "object",
+            "description": "Named interfaces: physical NICs connected to networks, or OS-only interfaces (loopback).",
+            "patternProperties": {
+              "^[a-zA-Z0-9_.-]+$": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["physical", "loopback"],
+                    "default": "physical",
+                    "description": "'physical' gets a VirtualBox NIC when 'network' is set. 'loopback' is OS-only: no NIC, no MAC, skips .link template."
+                  },
+                  "network": {
+                    "type": "string",
+                    "description": "The name of the L2 network this interface is connected to. Required for 'physical'; forbidden for 'loopback'."
+                  },
+                  "ip": {
+                    "type": "string",
+                    "description": "CIDR (e.g. 10.0.12.1/24)"
+                  },
+                  "gateway": { "type": "string" },
+                  "dhcp": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable DHCP on this interface."
+                  },
+                  "mtu": {
+                    "type": "integer",
+                    "description": "MTU override. Uses OS default if omitted."
+                  },
+                  "configured": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "If false, config file is NOT generated."
+                  },
+                  "mac": {
+                    "type": "string",
+                    "description": "Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated deterministically if omitted."
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "vlans": {
             "type": "array",
-            "description": "Logical config for physical interfaces (eth1, eth2...).",
+            "description": "VLAN (802.1Q) interface configurations.",
             "items": {
               "type": "object",
+              "required": ["id", "parent"],
               "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4094,
+                  "description": "VLAN ID (1-4094)"
+                },
+                "parent": {
+                  "type": "string",
+                  "description": "Parent interface name (e.g., eth1)"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Custom interface name (e.g. 'vlan5'). Defaults to '{parent}.{id}' if omitted."
+                },
                 "ip": {
                   "type": "string",
-                  "description": "CIDR (e.g. 10.0.12.1/24)"
+                  "description": "IP address in CIDR notation"
                 },
-                "gateway": { "type": "string" },
-                "configured": {
-                  "type": "boolean",
-                  "default": true,
-                  "description": "If false, data is kept for grading/docs, but config file is NOT generated."
+                "gateway": { "type": "string" }
+              }
+            }
+          },
+          "tunnels": {
+            "type": "array",
+            "description": "IP tunnel configurations (IPIP, GRE, SIT).",
+            "items": {
+              "type": "object",
+              "required": ["local", "remote"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "default": "tun0",
+                  "description": "Tunnel interface name"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["ipip", "gre", "sit"],
+                  "default": "ipip",
+                  "description": "Tunnel type"
+                },
+                "local": {
+                  "type": "string",
+                  "description": "Local endpoint IP address"
+                },
+                "remote": {
+                  "type": "string",
+                  "description": "Remote endpoint IP address"
+                },
+                "ip": {
+                  "type": "string",
+                  "description": "IP address in CIDR notation for the tunnel interface"
                 }
               }
             }
           },
-          "bridge": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string", "default": "br0" },
-              "stp": { "type": "boolean", "default": false },
-              "configured": { "type": "boolean", "default": true }
+          "bridges": {
+            "type": "array",
+            "description": "Bridge configurations. Each bridge groups interfaces/VLANs into one L2 domain.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "default": "br0",
+                  "description": "Bridge interface name."
+                },
+                "stp": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable Spanning Tree Protocol."
+                },
+                "members": {
+                  "type": "array",
+                  "description": "Interface or VLAN names that are bridge ports. If omitted, all non-loopback interfaces on the node are used.",
+                  "items": { "type": "string" }
+                },
+                "configured": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "If false, config file is NOT generated."
+                }
+              }
             }
           },
           "routing": {
@@ -118,7 +225,15 @@
               "router_id": { "type": "string" },
               "static": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "destination": { "type": "string" },
+                    "gateway": { "type": "string" }
+                  },
+                  "required": ["destination", "gateway"],
+                  "additionalProperties": false
+                }
               },
               "ospf": {
                 "type": "object",
@@ -136,6 +251,24 @@
                         }
                       }
                     }
+                  }
+                }
+              },
+              "rip": {
+                "type": "object",
+                "description": "RIP routing configuration.",
+                "properties": {
+                  "enabled": { "type": "boolean", "default": false },
+                  "version": {
+                    "type": "integer",
+                    "enum": [1, 2],
+                    "default": 2,
+                    "description": "RIP version (1 or 2)"
+                  },
+                  "interfaces": {
+                    "type": "array",
+                    "description": "Interfaces participating in RIP",
+                    "items": { "type": "string" }
                   }
                 }
               },
