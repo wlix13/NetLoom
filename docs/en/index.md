@@ -1,6 +1,6 @@
 # NetLoom
 
-**Network Lab Topology Orchestrator**
+## Network Lab Topology Orchestrator
 
 NetLoom is a command-line utility for creating and managing network topologies for educational labs. It automates the provisioning of VirtualBox VMs, network configuration generation, and topology deployment.
 
@@ -80,26 +80,34 @@ meta:
   id: "simple-lab"
   name: "Simple Network Lab"
 
-links:
-  - endpoints: ["R1", "R2"]
-  - endpoints: ["R1", "H1"]
+networks:
+  - name: r1-r2
+  - name: r1-h1
 
 nodes:
   - name: R1
     role: router
     interfaces:
-      - ip: "10.0.1.1/24"
-      - ip: "192.168.1.1/24"
+      eth1:
+        network: r1-r2
+        ip: "10.0.1.1/24"
+      eth2:
+        network: r1-h1
+        ip: "192.168.1.1/24"
 
   - name: R2
     role: router
     interfaces:
-      - ip: "10.0.1.2/24"
+      eth1:
+        network: r1-r2
+        ip: "10.0.1.2/24"
 
   - name: H1
     role: host
     interfaces:
-      - ip: "192.168.1.10/24"
+      eth1:
+        network: r1-h1
+        ip: "192.168.1.10/24"
         gateway: "192.168.1.1"
 ```
 
