@@ -1,0 +1,147 @@
+# yaml-language-server: $schema=./topology-schema.json
+meta:
+  id: "lab-example"
+  name: "Example Lab Topology"
+  description: "Comprehensive network lab demonstrating all supported features"
+
+defaults:
+  ip_forwarding: false
+  sysctl:
+    net.core.somaxconn: 1024
+
+networks:
+  - name: r1-r2
+  - name: r2-r3
+  - name: r1-sw1
+  - name: sw1-h1
+  - name: sw1-h2
+
+nodes:
+  # Router with OSPF and static routes
+  - name: R1
+    role: router
+    sysctl:
+      net.ipv4.ip_forward: 1
+    interfaces:
+      lo0:
+        kind: loopback
+        ip: "10.255.1.1/32"
+      eth1:
+        network: r1-r2
+        ip: "10.0.12.1/24"
+      eth2:
+        network: r1-sw1
+        ip: "10.0.1.1/24"
+    routing:
+      engine: bird
+      router_id: "1.1.1.1"
+      static:
+        - destination: "10.0.23.0/24"
+          gateway: "10.0.12.2"
+      ospf:
+        enabled: true
+        areas:
+          - id: "0.0.0.0"
+            interfaces: ["eth1", "eth2"]
+
+  # Router with RIP
+  - name: R2
+    role: router
+    interfaces:
+      eth1:
+        network: r1-r2
+        ip: "10.0.12.2/24"
+      eth2:
+        network: r2-r3
+        ip: "10.0.23.1/24"
+    routing:
+      engine: bird
+      router_id: "2.2.2.2"
+      rip:
+        enabled: true
+        version: 2
+        interfaces: ["eth1", "eth2"]
+
+  # Router with IPIP tunnel
+  - name: R3
+    role: router
+    interfaces:
+      eth1:
+        network: r2-r3
+        ip: "10.0.23.2/24"
+    tunnels:
+      - name: tun0
+        type: ipip
+        local: "10.0.23.2"
+        remote: "10.0.12.1"
+        ip: "10.255.0.2/30"
+    routing:
+      engine: bird
+      router_id: "3.3.3.3"
+      static:
+        - destination: "0.0.0.0/0"
+          gateway: "10.0.23.1"
+
+  # Switch with STP and VLANs
+  - name: SW1
+    role: switch
+    bridges:
+      - name: br0
+        stp: true
+        members: [eth1, eth2, eth3]
+    vlans:
+      - id: 100
+        parent: eth1
+        ip: "10.100.0.1/24"
+      - id: 200
+        parent: eth1
+        ip: "10.200.0.1/24"
+    interfaces:
+      eth1:
+        network: r1-sw1
+      eth2:
+        network: sw1-h1
+      eth3:
+        network: sw1-h2
+
+  # Host with firewall
+  - name: H1
+    role: host
+    interfaces:
+      eth1:
+        network: sw1-h1
+        ip: "10.0.1.10/24"
+        gateway: "10.0.1.1"
+    services:
+      http_server: 8080
+      firewall:
+        impl: nftables
+        rules:
+          - action: accept
+            proto: tcp
+            dport: 22
+          - action: accept
+            proto: tcp
+            dport: 8080
+          - action: accept
+            proto: icmp
+          - action: drop
+            src: "0.0.0.0/0"
+
+  # Host with WireGuard
+  - name: H2
+    role: host
+    interfaces:
+      eth1:
+        network: sw1-h2
+        ip: "10.0.1.20/24"
+        gateway: "10.0.1.1"
+    services:
+      wireguard:
+        private_key: "REPLACE_WITH_PRIVATE_KEY"
+        listen_port: 51820
+        address: "10.200.0.1/24"
+        peers:
+          - public_key: "REPLACE_WITH_PEER_PUBLIC_KEY"
+            allowed_ips: "10.200.0.2/32"
+            endpoint: "203.0.113.1:51820"
