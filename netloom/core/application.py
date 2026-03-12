@@ -1,7 +1,7 @@
 """Application singleton with dependency injection for controllers."""
 
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, ClassVar
 
 from rich.console import Console
 
@@ -14,7 +14,7 @@ from ..controllers.topology import TopologyController
 class Application:
     """Main application."""
 
-    _instance: Self | None = None
+    _instance: ClassVar["Application | None"] = None
 
     def __init__(self) -> None:
         self._console = Console()
@@ -25,7 +25,7 @@ class Application:
         self._debug: bool = True
 
     @classmethod
-    def current(cls) -> Self:
+    def current(cls) -> "Application":
         """Get current application instance."""
 
         if cls._instance is None:

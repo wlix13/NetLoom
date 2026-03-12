@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from FATtools import FAT, mkfat  # type: ignore[import-untyped]
-from FATtools.disk import disk  # type: ignore[import-untyped]
+from FATtools import FAT, mkfat
+from FATtools.disk import disk
 
 
 @dataclass
@@ -52,7 +52,7 @@ def _open_fat_fs(flat_path: Path, mode: str = "r+b"):
 
     d = disk(str(flat_path), mode)
     d.seek(0)
-    d.mbr = None  # No MBR, direct FAT filesystem
+    d.mbr = None  # ty: ignore[unresolved-attribute] # No MBR, direct FAT filesystem
 
     # read boot sector and detect FAT type
     bs = d.read(512)
