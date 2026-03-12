@@ -18,16 +18,83 @@ All commands require the `--topology` option and accept these global options:
 | `--ova`        | Path   | -                  | Path to base OVA (used on first init)                 |
 | `--base-vm`    | String | `Labs-Base`        | Name for the imported base VM                         |
 | `--snapshot`   | String | `golden`           | Snapshot name used for linked clones                  |
+| `--debug`      | Flag   | false              | Enable debug output (writes `_node.json` per node)    |
 | `-h, --help`   | -      | -                  | Show help message                                     |
 
 ## Commands
 
-### init
+The CLI is organized into three groups:
 
-Import base OVA and create a golden snapshot.
+- **Pipeline commands** (`up`, `down`) — run multiple steps in sequence
+- **Step commands** (`steps <cmd>`) — run individual step one at a time
+- **Management commands** (`save`, `restore`, `list-templates`, `show`) — inspect and manage configs
+
+---
+
+## Pipeline Commands
+
+### up
+
+Bring a topology up in one shot: create VMs, generate configs, attach them, and start.
 
 ```bash
-netloom --topology lab.yaml --ova base.ova init
+netloom --topology lab.yaml up
+```
+
+**Options:**
+
+| Option      | Type | Default | Description                                          |
+| --------    | ---- | ------- | ---------------------------------------------------- |
+| `--init`    | Flag | false   | Also run `init` (import OVA, take snapshot) first    |
+| `--yes, -y` | Flag | false   | Skip confirmation prompt                             |
+
+**Pipeline:** `(init →) create → gen → attach → start`
+
+```bash
+# First-time deployment including base VM import
+netloom --topology lab.yaml --ova base.ova up --init
+
+# Subsequent deployments (base VM already exists)
+netloom --topology lab.yaml up
+```
+
+---
+
+### down
+
+Tear a topology down: stop all VMs, then destroy them.
+
+```bash
+netloom --topology lab.yaml down
+```
+
+**Options:**
+
+| Option      | Type | Default | Description                    |
+| ----------- | ---- | ------- | ------------------------------ |
+| `--all`     | Flag | false   | Also destroy the base VM       |
+| `--yes, -y` | Flag | false   | Skip confirmation prompt       |
+
+**Pipeline:** `stop → destroy`
+
+---
+
+## Step Commands
+
+Individual steps are grouped under the `steps` subcommand. Use these when you need fine-grained control.
+
+```bash
+netloom --topology lab.yaml steps <command>
+```
+
+**Typical order:** `init → create → gen → attach → start`
+
+### steps init
+
+Import base OVA and take a snapshot.
+
+```bash
+netloom --topology lab.yaml --ova base.ova steps init
 ```
 
 **What it does:**
@@ -42,72 +109,78 @@ Only run `init` once per base image. The base VM is reused across all topologies
 
 ---
 
-### create
+### steps create
 
 Create linked clones for all topology nodes and attach empty config-drives.
 
 ```bash
-netloom --topology lab.yaml create
+netloom --topology lab.yaml steps create
 ```
 
 **What it does:**
 
 1. Creates a linked clone for each node in the topology
 2. Configures VirtualBox internal networks for each link
-3. Attaches an empty config-drive ISO to each VM
+3. Attaches an empty config-drive VMDK to each VM
 
 ---
 
-### gen
+### steps gen
 
-Generate configuration files for all nodes.
+Generate configuration files for all nodes (or a single node).
 
 ```bash
-netloom --topology lab.yaml gen
+netloom --topology lab.yaml steps gen
 ```
 
 **Options:**
 
-| Option        | Type   | Default    | Description              |
-| ------------- | ------ | ---------- | ------------------------ |
-| `--templates` | String | `networkd` | Template set name to use |
+| Option        | Type   | Default | Description                       |
+| ------------- | ------ | ------- | -------------------------------   |
+| `--node, -n`  | String | -       | Generate config for one node only |
 
 **What it does:**
 
 1. Renders Jinja2 templates for each node based on topology config
 2. Generates networkd configs, hostname, sysctl settings, etc.
-3. Outputs to `<workdir>/configs/<node>/`
+3. Auto-detects and renders additional template sets per node:
+    - `bird` — when `routing.engine` is `bird`
+    - `nftables` — when `services.firewall` is configured
+    - `wireguard` — when `services.wireguard` is configured
+4. Outputs to `<workdir>/configs/<node>/`
 
-**Available template sets:**
+```bash
+# Generate for all nodes
+netloom --topology lab.yaml steps gen
 
-- `networkd` - systemd-networkd configuration (default)
-
-Use `list-templates` to see all available template sets.
+# Generate only for R1
+netloom --topology lab.yaml steps gen --node R1
+```
 
 ---
 
-### attach
+### steps attach
 
 Copy generated configs into each node's config-drive.
 
 ```bash
-netloom --topology lab.yaml attach
+netloom --topology lab.yaml steps attach
 ```
 
 **What it does:**
 
-1. Mounts each VM's config-drive ISO
+1. Mounts each VM's config-drive VMDK
 2. Copies configs from `<workdir>/configs/<node>/` to the config-drive
 3. Unmounts the config-drive
 
 ---
 
-### start
+### steps start
 
 Start all topology VMs.
 
 ```bash
-netloom --topology lab.yaml start
+netloom --topology lab.yaml steps start
 ```
 
 **What it does:**
@@ -117,12 +190,12 @@ netloom --topology lab.yaml start
 
 ---
 
-### stop
+### steps stop
 
-Send ACPI shutdown signal to all topology VMs.
+Send stop signals to all topology VMs.
 
 ```bash
-netloom --topology lab.yaml stop
+netloom --topology lab.yaml steps stop
 ```
 
 **What it does:**
@@ -132,19 +205,20 @@ netloom --topology lab.yaml stop
 
 ---
 
-### destroy
+### steps destroy
 
 Stop and remove all topology VMs.
 
 ```bash
-netloom --topology lab.yaml destroy
+netloom --topology lab.yaml steps destroy
 ```
 
 **Options:**
 
-| Option  | Type | Default | Description                       |
-| ------- | ---- | ------- | --------------------------------- |
-| `--all` | Flag | false   | Also destroy the base (golden) VM |
+| Option      | Type | Default | Description                             |
+| ----------- | ---- | ------- | --------------------------------------- |
+| `--all`     | Flag | false   | Also destroy the base (golden) VM       |
+| `--yes, -y` | Flag | false   | Skip confirmation prompt                |
 
 **What it does:**
 
@@ -158,9 +232,11 @@ Using `--all` will require re-running `init` with the OVA for future deployments
 
 ---
 
+## Management Commands
+
 ### save
 
-Pull changed files from config-drive back to host.
+Pull changed files from each node's config-drive back to the host.
 
 ```bash
 netloom --topology lab.yaml save
@@ -176,7 +252,7 @@ netloom --topology lab.yaml save
 
 ### restore
 
-Restore last saved configs into staging area.
+Restore last saved configs into the staging area.
 
 ```bash
 netloom --topology lab.yaml restore
@@ -186,7 +262,7 @@ netloom --topology lab.yaml restore
 
 1. Copies saved configs from `<workdir>/saved/<node>/`
 2. Overwrites `<workdir>/configs/<node>/`
-3. Ready for `attach` to deploy to VMs
+3. Ready for `steps attach` to deploy to VMs
 
 ---
 
@@ -200,9 +276,12 @@ netloom --topology lab.yaml list-templates
 
 **Output example:**
 
-```
+```bash
 Available template sets:
   - networkd
+  - bird
+  - nftables
+  - wireguard
 ```
 
 ---
@@ -215,59 +294,72 @@ Display topology information.
 netloom --topology lab.yaml show
 ```
 
-**Output example:**
+**Options:**
 
+| Option          | Type   | Default | Description                          |
+| --------------- | ------ | ------- | ------------------------------------ |
+| `--node, -n`    | String | -       | Show only this node                  |
+| `--routing, -r` | Flag   | false   | Show routing config (static/OSPF/RIP)|
+| `--services, -s`| Flag   | false   | Show services config                 |
+| `--bridges, -b` | Flag   | false   | Show bridge config                   |
+| `--vlans, -v`   | Flag   | false   | Show VLAN config                     |
+| `--tunnels, -t` | Flag   | false   | Show tunnel config                   |
+| `--sysctl, -y`  | Flag   | false   | Show sysctl settings                 |
+| `--all, -a`     | Flag   | false   | Show all sections                    |
+| `--map, -m`     | Flag   | false   | Show network connectivity table      |
+| `--graph, -g`   | Flag   | false   | Draw topology as a tree diagram      |
+
+```bash
+netloom --topology lab.yaml show              # node summary table
+netloom --topology lab.yaml show --map        # network connectivity table
+netloom --topology lab.yaml show --graph      # tree diagram
+netloom --topology lab.yaml show -n R1 -r     # routing info for R1
+netloom --topology lab.yaml show -n R1 --all  # all details for R1
 ```
-Topology: My Lab (my-lab)
-A sample network topology
 
-Nodes: 3
-  R1 (router)
-    eth1 [10.0.1.1/24] -> R2
-    eth2 [192.168.1.1/24] -> H1
-  R2 (router)
-    eth1 [10.0.1.2/24] -> R1
-  H1 (host)
-    eth1 [192.168.1.10/24] -> R1
-
-Links: 2
-  R1/eth1 <-> R2/eth1
-  R1/eth2 <-> H1/eth1
-```
+---
 
 ## Usage Examples
 
 ### Deploy a New Topology
 
 ```bash
-# First deployment with new base image
-netloom --topology lab.yaml --ova base.ova init
-netloom --topology lab.yaml create
-netloom --topology lab.yaml gen
-netloom --topology lab.yaml attach
-netloom --topology lab.yaml start
+# First deployment — import base OVA and bring everything up
+netloom --topology lab.yaml --ova base.ova up --init
+
+# Subsequent deployments — base VM already exists
+netloom --topology lab.yaml up
 ```
 
 ### Update Configurations
 
 ```bash
-# After editing topology YAML
-netloom --topology lab.yaml gen
-netloom --topology lab.yaml attach
+# After editing topology YAML — regenerate and reattach
+netloom --topology lab.yaml steps gen
+netloom --topology lab.yaml steps attach
 # Reboot VMs or re-apply configs manually
+```
+
+### Tear Down
+
+```bash
+# Stop and destroy topology VMs
+netloom --topology lab.yaml down
+
+# Also remove the base VM
+netloom --topology lab.yaml down --all
 ```
 
 ### Custom Workdir
 
 ```bash
-# Use a specific directory for this lab
-netloom --topology lab.yaml --workdir ./lab1-work create
+netloom --topology lab.yaml --workdir ./lab1-work up
 ```
 
 ### Multiple Topologies
 
 ```bash
 # Each topology uses its own VMs but shares the base
-netloom --topology lab1.yaml create
-netloom --topology lab2.yaml create
+netloom --topology lab1.yaml up
+netloom --topology lab2.yaml up
 ```
