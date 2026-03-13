@@ -92,10 +92,6 @@ class TopologyConverter:
         if node.sysctl:
             custom.update(node.sysctl)
 
-        # Don't make users broke router by default :)
-        if node.role == "router":
-            ip_forwarding = True
-
         return InternalSysctl(ip_forwarding=ip_forwarding, custom=custom)
 
     def _convert_routing(self, node: Node) -> InternalRouting | None:
