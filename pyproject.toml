@@ -42,3 +42,6 @@ lint.isort.lines-after-imports = 2
 
 [tool.ty]
 environment.root = [ "." ]
+
+[tool.poe]
+tasks.docs = "mkdocs serve -f mkdocs.yaml"
