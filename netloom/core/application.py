@@ -1,14 +1,14 @@
 """Application singleton with dependency injection for controllers."""
 
+from functools import cached_property
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from rich.console import Console
 
 from ..controllers.config import ConfigController
 from ..controllers.infrastructure import InfrastructureController
-from ..controllers.network import NetworkController
-from ..controllers.topology import TopologyController
+from .vbox import VBoxSettings
 
 
 class Application:
@@ -18,11 +18,9 @@ class Application:
 
     def __init__(self) -> None:
         self._console = Console()
-        self._controllers: dict[str, Any] = {}
-
-        # workdir and topology state
         self._workdir: Path | None = None
         self._debug: bool = True
+        self.vbox_settings: VBoxSettings = VBoxSettings()
 
     @classmethod
     def current(cls) -> "Application":
@@ -39,63 +37,34 @@ class Application:
         cls._instance = None
 
     @property
-    def console(self) -> "Console":
-        """Get rich console for displaying messages."""
-
+    def console(self) -> Console:
+        """Rich console for user-facing output."""
         return self._console
 
     @property
     def workdir(self) -> Path | None:
-        """Get the current working directory."""
-
         return self._workdir
 
     @workdir.setter
     def workdir(self, value: Path | str | None) -> None:
-        """Set the current working directory."""
-
         self._workdir = Path(value) if value else None
 
     @property
     def debug(self) -> bool:
-        """Get debug mode flag."""
-
         return self._debug
 
     @debug.setter
     def debug(self, value: bool) -> None:
-        """Set debug mode flag."""
-
         self._debug = value
 
-    @property
-    def topology(self) -> TopologyController:
-        """Get topology controller."""
-
-        if "topology" not in self._controllers:
-            self._controllers["topology"] = TopologyController(self)
-        return self._controllers["topology"]
-
-    @property
+    @cached_property
     def infrastructure(self) -> InfrastructureController:
-        """Get infrastructure controller."""
+        """Infrastructure controller."""
 
-        if "infrastructure" not in self._controllers:
-            self._controllers["infrastructure"] = InfrastructureController(self)
-        return self._controllers["infrastructure"]
+        return InfrastructureController(self)
 
-    @property
+    @cached_property
     def config(self) -> ConfigController:
-        """Get config controller."""
+        """Config controller."""
 
-        if "config" not in self._controllers:
-            self._controllers["config"] = ConfigController(self)
-        return self._controllers["config"]
-
-    @property
-    def network(self) -> NetworkController:
-        """Get network controller."""
-
-        if "network" not in self._controllers:
-            self._controllers["network"] = NetworkController(self)
-        return self._controllers["network"]
+        return ConfigController(self)
