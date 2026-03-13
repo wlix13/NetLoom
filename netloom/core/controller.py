@@ -1,13 +1,8 @@
 """Base controller class for business logic."""
 
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic
 
-
-if TYPE_CHECKING:
-    from .application import Application
-
-
-AppT = TypeVar("AppT", bound="Application")
+from .types import AppT
 
 
 class BaseController(Generic[AppT]):  # noqa: UP046
