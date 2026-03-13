@@ -26,7 +26,7 @@ dependencies = [
 scripts.netloom = "netloom.cli:cli"
 
 [dependency-groups]
-dev = [ "prek", "ruff", "ty" ]
+dev = [ "poethepoet", "prek", "ruff", "ty" ]
 docs = [ "mkdocs", "mkdocs-material", "mkdocs-static-i18n" ]
 
 [tool.hatch]
