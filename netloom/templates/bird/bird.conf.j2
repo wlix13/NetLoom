@@ -1,0 +1,50 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.section_header("BIRD Internet Routing Daemon configuration for " ~ node.name) }}
+
+# Logging
+log syslog all;
+
+# Router ID
+{% if node.routing and node.routing.router_id -%}
+router id {{ node.routing.router_id }};
+{% else -%}
+# router id <IP_ADDRESS>;  # Set a router ID
+{% endif %}
+
+# Device protocol - required for interface scanning
+protocol device {
+    scan time 10;
+}
+
+# Direct protocol - generates routes for directly connected networks
+protocol direct {
+    ipv4;
+    interface "*";
+}
+
+# Kernel protocol - synchronizes routes with the kernel
+protocol kernel {
+    ipv4 {
+        export all;
+        import none;
+    };
+    learn;
+    persist;
+    scan time 20;
+}
+
+{% if node.routing and node.routing.static_routes -%}
+# Include static routes configuration
+include "/etc/bird/conf.d/static.conf";
+
+{% endif -%}
+{% if node.routing and node.routing.rip and node.routing.rip.enabled -%}
+# Include RIP configuration
+include "/etc/bird/conf.d/rip.conf";
+
+{% endif -%}
+{% if node.routing and node.routing.ospf_enabled -%}
+# Include OSPF configuration
+include "/etc/bird/conf.d/ospf.conf";
+
+{% endif %}
