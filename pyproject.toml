@@ -42,3 +42,9 @@ lint.isort.lines-after-imports = 2
 
 [tool.ty]
 environment.root = [ "." ]
+
+[tool.poe]
+tasks.docs.sequence = [
+  { cmd = "uv sync --group docs" },
+  { cmd = "mkdocs serve -f mkdocs.yaml" },
+]
