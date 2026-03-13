@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ..core.controller import BaseController
 from ..core.enums import VMControlAction, VMState
 from ..core.vbox import VBoxManage
-from ..data import ConfigDrive, create_configdrive
+from ..data import ConfigDrive, format_fat16
 
 
 if TYPE_CHECKING:
@@ -260,7 +260,7 @@ class InfrastructureController(BaseController["Application"]):
                     self._vbox.close_medium(cfg_vmdk.as_posix())
                 except subprocess.CalledProcessError:
                     pass
-                create_configdrive(cfg_vmdk, size_mb=self._s.configdrive_mb)
+                self._create_configdrive(cfg_vmdk)
 
             # attach at SATA port 1 (port 0 is the OS disk from the clone)
             self._ensure_sata_storage_controller(node.name)
@@ -338,3 +338,12 @@ class InfrastructureController(BaseController["Application"]):
         """Return the ConfigDrive handle for a node."""
 
         return ConfigDrive(self._cfg_vmdk(node))
+
+    def _create_configdrive(self, vmdk_path: Path) -> ConfigDrive:
+        """Create and format a new config-drive VMDK."""
+
+        self._vbox.create_medium(vmdk_path, size_mb=self._s.configdrive_mb)
+        cd = ConfigDrive(vmdk_path)
+        format_fat16(cd.flat, self._s.configdrive_mb)
+
+        return cd
