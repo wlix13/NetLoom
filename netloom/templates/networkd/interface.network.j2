@@ -4,10 +4,10 @@
 Name={{ iface.name }}
 
 [Link]
-# MTU={{ iface.mtu if iface.mtu is defined else 1500 }}
+MTUBytes={{ iface.mtu if iface.mtu else 1500 }}
 
 [Network]
-{% if iface.dhcp is defined and iface.dhcp -%}
+{% if iface.dhcp -%}
 DHCP=yes
 {% else -%}
 LinkLocalAddressing=no

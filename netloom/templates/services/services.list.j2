@@ -1,13 +1,16 @@
 {# VM services list for the boot agent #}
 {# Format: + service (enable) or - service (disable) #}
-{% if node.interfaces|selectattr('configured')|list -%}
+{% if node.interfaces|selectattr('configured')|list or node.bridges or node.vlans or node.tunnels -%}
 + systemd-networkd
 {% endif -%}
-{% if node.routing and node.routing.ospf_enabled -%}
+{% if node.routing and node.routing.configured -%}
+{% set has_routing = node.routing.ospf_enabled or (node.routing.rip and node.routing.rip.enabled) or node.routing.static_routes -%}
+{% if has_routing -%}
 {% if node.routing.engine == 'frr' -%}
 + frr
 {% elif node.routing.engine == 'bird' -%}
 + bird
+{% endif -%}
 {% endif -%}
 {% endif -%}
 {% if node.services and node.services.firewall -%}
