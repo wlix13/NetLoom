@@ -1,0 +1,7 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Rename interface to " ~ iface.name ~ " based on MAC " ~ iface.mac_address) }}
+[Match]
+MACAddress={{ iface.mac_address|lower }}
+
+[Link]
+Name={{ iface.name }}
