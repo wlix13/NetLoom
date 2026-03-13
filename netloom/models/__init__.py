@@ -5,20 +5,9 @@ This package contains:
 - internal: Internal representations for infrastructure controllers
 - converters: Conversion utilities between config and internal models
 - config: User-facing topology configuration models (based on topology-schema.json)
-
-Note: For the recommended approach, use the Application and TopologyController:
-    from netloom import Application
-    app = Application.current()
-    topology = app.topology.load("topology.yaml")
-    internal = app.topology.convert(topology, workdir="./work")
 """
 
 from .common import (
-    CIDRStr,
-    IPv4Str,
-    NameID,
-    PortNum,
-    RouterIdStr,
     load_topology,
 )
 from .config import (
@@ -27,14 +16,18 @@ from .config import (
     FirewallConfig,
     FirewallRule,
     InterfaceConfig,
-    Link,
     Meta,
+    Network,
     Node,
     OSPFArea,
     OSPFConfig,
+    RIPConfig,
     RoutingConfig,
     ServicesConfig,
+    StaticRoute,
     Topology,
+    TunnelConfig,
+    VLANConfig,
     WireguardConfig,
     WireguardPeer,
 )
@@ -48,14 +41,18 @@ from .internal import (
     InternalFirewallRule,
     InternalInterface,
     InternalLink,
+    InternalNetwork,
     InternalNode,
     InternalOSPFArea,
     InternalResources,
+    InternalRIP,
     InternalRouting,
     InternalServices,
     InternalStaticRoute,
     InternalSysctl,
     InternalTopology,
+    InternalTunnel,
+    InternalVLAN,
     InternalWireguard,
     InternalWireguardPeer,
     NicModel,
@@ -65,11 +62,6 @@ from .internal import (
 
 __all__ = [
     # Common types
-    "CIDRStr",
-    "IPv4Str",
-    "NameID",
-    "PortNum",
-    "RouterIdStr",
     "load_topology",
     # Config models
     "BridgeConfig",
@@ -77,14 +69,18 @@ __all__ = [
     "FirewallConfig",
     "FirewallRule",
     "InterfaceConfig",
-    "Link",
     "Meta",
+    "Network",
     "Node",
     "OSPFArea",
     "OSPFConfig",
+    "RIPConfig",
     "RoutingConfig",
     "ServicesConfig",
+    "StaticRoute",
     "Topology",
+    "TunnelConfig",
+    "VLANConfig",
     "WireguardConfig",
     "WireguardPeer",
     # Converters
@@ -96,14 +92,18 @@ __all__ = [
     "InternalFirewallRule",
     "InternalInterface",
     "InternalLink",
+    "InternalNetwork",
     "InternalNode",
     "InternalOSPFArea",
+    "InternalRIP",
     "InternalResources",
     "InternalRouting",
     "InternalServices",
     "InternalStaticRoute",
     "InternalSysctl",
     "InternalTopology",
+    "InternalTunnel",
+    "InternalVLAN",
     "InternalWireguard",
     "InternalWireguardPeer",
     "NicModel",
