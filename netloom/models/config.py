@@ -1,11 +1,22 @@
-"""Topology configuration models based on topology-schema.json (v3.0).
+"""Topology configuration models based on topology-schema.json.
 
-This module implements the ASVK Structured Topology (No-Files/No-Packages) schema.
+This module implements the ASVK Structured Topology schema.
 """
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from ..core.enums import (
+    FirewallAction,
+    FirewallImpl,
+    InterfaceKind,
+    NodeRole,
+    ParavirtProvider,
+    RoutingEngine,
+    TunnelType,
+    VBoxChipset,
+)
 
 
 class Meta(BaseModel):
@@ -19,10 +30,10 @@ class Meta(BaseModel):
 class VBoxConfig(BaseModel):
     """VirtualBox-specific VM settings."""
 
-    paravirt_provider: Literal["default", "legacy", "minimal", "hyperv", "kvm", "none"] = "kvm"
+    paravirt_provider: ParavirtProvider = ParavirtProvider.KVM
     """Paravirtualization provider."""
 
-    chipset: Literal["piix3", "ich9"] = "ich9"
+    chipset: VBoxChipset = VBoxChipset.ICH9
     """Chipset type."""
 
     ioapic: bool = True
@@ -35,7 +46,7 @@ class VBoxConfig(BaseModel):
 class Defaults(BaseModel):
     """Global defaults applied to all nodes."""
 
-    ip_forwarding: bool = False
+    ip_forwarding: bool = Field(False, description="Separate sysctl option for forwarding")
     sysctl: dict[str, Any] | None = Field(
         default=None,
         description="Global kernel parameters (e.g. net.ipv4.ip_forward=1)",
@@ -46,24 +57,98 @@ class Defaults(BaseModel):
     )
 
 
-class Link(BaseModel):
-    """Physical connection between two nodes."""
+class Network(BaseModel):
+    """L2 network definition, mapped to a VirtualBox internal network."""
 
-    endpoints: Annotated[list[str], Field(min_length=2, max_length=2)]
-    """Exactly two node names that this link connects."""
+    name: str
+    """Unique name of the L2 network."""
 
 
 class InterfaceConfig(BaseModel):
-    """Logical configuration for a physical interface (eth1, eth2, etc.)."""
+    """Logical configuration for a named interface (map value in node.interfaces)."""
 
+    network: str | None = Field(
+        None,
+        description="The L2 network this interface is connected to. Omit for standalone interfaces (e.g. loopback).",
+    )
+    kind: InterfaceKind = Field(
+        default=InterfaceKind.PHYSICAL,
+        description=(
+            "Interface kind. 'physical' gets a VirtualBox NIC when 'network' is set. "
+            "'loopback' is OS-only: no VirtualBox NIC, no MAC, skips .link template."
+        ),
+    )
+    mac: str | None = Field(
+        default=None,
+        description="Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated if omitted.",
+    )
     ip: str | None = Field(
         default=None,
         description="CIDR (e.g. 10.0.12.1/24)",
     )
-    gateway: str | None = None
+    gateway: str | None = Field(
+        default=None,
+        description="Gateway IP address (e.g. 10.0.12.254)",
+    )
+    dhcp: bool = Field(
+        default=False,
+        description="Enable DHCP on this interface.",
+    )
+    mtu: int | None = Field(
+        default=None,
+        description="MTU for this interface. Uses OS default if omitted.",
+    )
     configured: bool = Field(
         default=True,
         description="If false, config file is NOT generated.",
+    )
+
+    @model_validator(mode="after")
+    def _loopback_must_not_have_network(self) -> "InterfaceConfig":
+        if self.kind == InterfaceKind.LOOPBACK and self.network is not None:
+            raise ValueError("A 'loopback' interface cannot have 'network' set.")
+        return self
+
+
+class VLANConfig(BaseModel):
+    """VLAN (802.1Q) interface configuration."""
+
+    id: Annotated[
+        int,
+        Field(ge=1, le=4094, description="VLAN ID (1-4094)."),
+    ]
+    parent: str = Field(
+        ...,
+        description="Parent interface name (e.g., eth1).",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Custom interface name (e.g. 'vlan5'). Defaults to '{parent}.{id}'.",
+    )
+    ip: str | None = Field(
+        default=None,
+        description="IP address in CIDR notation for the VLAN interface.",
+    )
+    gateway: str | None = Field(
+        default=None,
+        description="Gateway IP address for the VLAN interface.",
+    )
+
+
+class TunnelConfig(BaseModel):
+    """IP tunnel configuration (IPIP, GRE, SIT)."""
+
+    name: str = "tun0"
+    """Tunnel interface name."""
+    type: TunnelType
+    """Tunnel type."""
+    local: str
+    """Local endpoint IP address."""
+    remote: str
+    """Remote endpoint IP address."""
+    ip: str | None = Field(
+        default=None,
+        description="IP address in CIDR notation for the tunnel interface.",
     )
 
 
@@ -72,10 +157,27 @@ class BridgeConfig(BaseModel):
 
     name: str = "br0"
     stp: bool = False
+    members: list[str] | None = Field(
+        default=None,
+        description=(
+            "Interface or VLAN names that are bridge ports. "
+            "If omitted, all non-loopback interfaces on the node are used."
+        ),
+    )
     configured: bool = Field(
         default=True,
         description="If false, config file is NOT generated.",
     )
+
+
+class StaticRoute(BaseModel):
+    """A static route entry."""
+
+    destination: str
+    """Destination network in CIDR notation (e.g., 10.0.0.0/8)."""
+
+    gateway: str
+    """Next-hop gateway IP address (e.g., 192.168.1.1)."""
 
 
 class OSPFArea(BaseModel):
@@ -86,6 +188,10 @@ class OSPFArea(BaseModel):
         default=None,
         description="List of interfaces in this area.",
     )
+    hello: int = Field(default=10, description="OSPF hello interval in seconds.")
+    dead: int = Field(default=40, description="OSPF dead interval in seconds.")
+    cost: int = Field(default=10, description="OSPF interface cost.")
+    retransmit: int = Field(default=5, description="OSPF retransmit interval in seconds.")
 
 
 class OSPFConfig(BaseModel):
@@ -98,16 +204,32 @@ class OSPFConfig(BaseModel):
     )
 
 
+class RIPConfig(BaseModel):
+    """RIP routing configuration."""
+
+    enabled: bool = False
+    version: Literal[1, 2] = 2
+    """RIP version (1 or 2)."""
+    interfaces: list[str] | None = Field(
+        default=None,
+        description="List of interfaces participating in RIP.",
+    )
+    update_time: int = Field(default=30, description="RIP update interval in seconds.")
+    timeout_time: int = Field(default=180, description="RIP timeout in seconds.")
+    garbage_time: int = Field(default=120, description="RIP garbage collection time in seconds.")
+
+
 class RoutingConfig(BaseModel):
     """Routing configuration for a node."""
 
-    engine: Literal["bird", "frr", "none"] | None = None
+    engine: RoutingEngine | None = None
     router_id: str | None = None
-    static: list[str] | None = Field(
+    static: list[StaticRoute] | None = Field(
         default=None,
-        description="Static routes (e.g., '10.0.0.0/8 via 192.168.1.1')",
+        description="Static routes.",
     )
     ospf: OSPFConfig | None = None
+    rip: RIPConfig | None = None
     configured: bool = Field(
         default=True,
         description="If false, config file is NOT generated.",
@@ -120,6 +242,7 @@ class WireguardPeer(BaseModel):
     public_key: str | None = None
     allowed_ips: str | None = None
     endpoint: str | None = None
+    keepalive: int = Field(default=25, description="PersistentKeepalive interval in seconds.")
 
 
 class WireguardConfig(BaseModel):
@@ -137,7 +260,7 @@ class WireguardConfig(BaseModel):
 class FirewallRule(BaseModel):
     """Firewall rule definition."""
 
-    action: Literal["accept", "drop", "reject"]
+    action: FirewallAction
     src: str | None = None
     dst: str | None = None
     proto: str | None = None
@@ -147,7 +270,7 @@ class FirewallRule(BaseModel):
 class FirewallConfig(BaseModel):
     """Firewall configuration."""
 
-    impl: Literal["nftables"] | None = None
+    impl: FirewallImpl | None = None
     rules: list[FirewallRule] | None = Field(
         default=None,
         description="List of firewall rules.",
@@ -166,16 +289,27 @@ class Node(BaseModel):
     """A node in the topology (router, switch, or host)."""
 
     name: str
-    role: Literal["router", "switch", "host"] = "host"
+    role: NodeRole
     sysctl: dict[str, Any] | None = Field(
         default=None,
         description="Node-specific kernel parameters.",
     )
-    interfaces: list[InterfaceConfig] | None = Field(
+    interfaces: dict[str, InterfaceConfig] | None = Field(
         default=None,
-        description="Logical config for physical interfaces (eth1, eth2...).",
+        description="Map of interface name to config (e.g. {'eth1': {network: 'lan1', ip: '10.0.0.1/24'}}).",
     )
-    bridge: BridgeConfig | None = None
+    vlans: list[VLANConfig] | None = Field(
+        default=None,
+        description="VLAN (802.1Q) interface configurations.",
+    )
+    tunnels: list[TunnelConfig] | None = Field(
+        default=None,
+        description="IP tunnel configurations (IPIP, GRE, SIT).",
+    )
+    bridges: list[BridgeConfig] | None = Field(
+        default=None,
+        description="Bridge configurations. Each bridge groups interfaces/VLANs into one L2 domain.",
+    )
     routing: RoutingConfig | None = None
     services: ServicesConfig | None = None
     commands: list[str] | None = Field(
@@ -188,7 +322,7 @@ class Topology(BaseModel):
     """Root topology configuration model."""
 
     meta: Meta
-    links: list[Link]
+    networks: list[Network]
     nodes: list[Node]
     defaults: Defaults | None = None
 
@@ -199,15 +333,3 @@ class Topology(BaseModel):
             if node.name == name:
                 return node
         return None
-
-    def get_node_links(self, node_name: str) -> list[Link]:
-        """Get all links connected to a specific node."""
-
-        return [link for link in self.links if node_name in link.endpoints]
-
-    def get_peer_node(self, link: Link, node_name: str) -> str | None:
-        """Get the peer node name for a given link and node."""
-
-        if node_name not in link.endpoints:
-            return None
-        return link.endpoints[0] if link.endpoints[1] == node_name else link.endpoints[1]
