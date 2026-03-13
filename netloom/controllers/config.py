@@ -12,7 +12,6 @@ from jinja2.exceptions import TemplateError
 
 from ..core.controller import BaseController
 from ..core.enums import InterfaceKind, RoutingEngine, TemplateSet
-from ..data import copy_from_configdrive, copy_tree_to_configdrive
 
 
 if TYPE_CHECKING:
@@ -310,7 +309,7 @@ class ConfigController(BaseController["Application"]):
             if not node.config_dir:
                 continue
             cfg = infra.get_configdrive(node)
-            copy_tree_to_configdrive(cfg, Path(node.config_dir))
+            cfg.copy_in(Path(node.config_dir))
 
     def save(self, topo: "InternalTopology") -> None:
         """Pull changed files from config-drives back to saved directory."""
@@ -322,7 +321,7 @@ class ConfigController(BaseController["Application"]):
                 continue
             saved = Path(node.saved_configs_dir)
             cfg = infra.get_configdrive(node)
-            copied = copy_from_configdrive(cfg, saved)
+            copied = cfg.copy_out(saved)
 
             if copied:
                 self.console.print(f"  [green]{node.name}[/green]: {len(copied)} file(s)")
