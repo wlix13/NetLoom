@@ -25,7 +25,7 @@ class VBoxManage:
     def _run(self, cmd: list[str]) -> None:
         """Run VBoxManage command, capturing output and raising on non-zero exit."""
 
-        subprocess.run(cmd, check=True, capture_output=True)  # noqa: S603
+        subprocess.run(cmd, check=True, capture_output=True, timeout=60)  # noqa: S603
 
     def _query(self, cmd: list[str]) -> str:
         """Run VBoxManage command and return its stdout as text."""
@@ -35,6 +35,7 @@ class VBoxManage:
             check=True,
             capture_output=True,
             text=True,
+            timeout=60,
         ).stdout
 
     def _probe(self, cmd: list[str]) -> str:
@@ -44,6 +45,7 @@ class VBoxManage:
             cmd,
             capture_output=True,
             text=True,
+            timeout=60,
         ).stdout
 
     def list_vms(self) -> dict[str, str]:
