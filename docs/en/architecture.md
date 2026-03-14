@@ -244,6 +244,44 @@ VBoxManage createmedium disk --filename "R1-cfg.vmdk" \
 
 The config-drive contains network configurations that the VM applies on boot.
 
+## Data Layer (`netloom/data/`)
+
+Config-drive I/O is handled by two modules:
+
+### `configdrive.py` — `ConfigDrive`
+
+`ConfigDrive` is a dataclass wrapping a VirtualBox split VMDK pair:
+
+| File                  | Role                                        |
+| --------------------- | ------------------------------------------- |
+| `<node>-cfg.vmdk`     | VirtualBox descriptor (metadata only)       |
+| `<node>-cfg-flat.vmdk`| Raw data file — the actual FAT16 filesystem |
+
+`_fat.py` operates directly on the flat file; the descriptor is only used by VirtualBox itself.
+
+```python
+drive = ConfigDrive(vmdk=Path("R1-cfg.vmdk"))
+drive.copy_in(Path("workdir/configs/R1"))   # staging → config-drive
+drive.copy_out(Path("workdir/saved/R1"))    # config-drive → host
+```
+
+| Method                | Description                                    |
+| --------------------- | ---------------------------------------------- |
+| `copy_in(src_dir)`    | Write a directory tree into the FAT filesystem |
+| `copy_out(dst_dir)`   | Read all files from the FAT filesystem to host |
+| `.flat`               | Property returning the `-flat.vmdk` path       |
+
+### `_fat.py` — FAT16 helpers
+
+Internal helpers that operate on the raw flat VMDK using `fattools`:
+
+| Function                             | Description                                         |
+| ------------------------------------ | --------------------------------------------------- |
+| `open_fat_fs(path, mode)`            | Context manager — opens the flat file as a FAT fs   |
+| `format_fat16(path, size_mb)`        | Format a raw file as FAT16                          |
+| `makedirs(fs, path)`                 | Create directory hierarchy inside the FAT fs        |
+| `copy_dir_recursive(fs, dst, copied)`| Recursively copy FAT fs tree to a local directory   |
+
 ### Internal Networks
 
 Networks are implemented as VirtualBox internal networks named `<topology-id>_<network-name>`:
