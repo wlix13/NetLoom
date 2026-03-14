@@ -17,6 +17,7 @@ from ..core.enums import (
     TunnelType,
     VBoxChipset,
 )
+from ..core.types import NameID
 
 
 class Meta(BaseModel):
@@ -117,13 +118,13 @@ class VLANConfig(BaseModel):
         int,
         Field(ge=1, le=4094, description="VLAN ID (1-4094)."),
     ]
-    parent: str = Field(
+    parent: NameID = Field(
         ...,
         description="Parent interface name (e.g., eth1).",
     )
-    name: str | None = Field(
+    name: NameID | None = Field(
         default=None,
-        description="Custom interface name (e.g. 'vlan5'). Defaults to '{parent}.{id}'.",
+        description="Custom interface name (e.g. 'vlan5'). Defaults to '{parent}-{id}'.",
     )
     ip: str | None = Field(
         default=None,
@@ -138,7 +139,7 @@ class VLANConfig(BaseModel):
 class TunnelConfig(BaseModel):
     """IP tunnel configuration (IPIP, GRE, SIT)."""
 
-    name: str = "tun0"
+    name: NameID = "tun0"
     """Tunnel interface name."""
     type: TunnelType
     """Tunnel type."""
@@ -155,9 +156,9 @@ class TunnelConfig(BaseModel):
 class BridgeConfig(BaseModel):
     """Bridge configuration for switch nodes."""
 
-    name: str = "br0"
+    name: NameID = "br0"
     stp: bool = False
-    members: list[str] | None = Field(
+    members: list[NameID] | None = Field(
         default=None,
         description=(
             "Interface or VLAN names that are bridge ports. "
@@ -294,7 +295,7 @@ class Node(BaseModel):
         default=None,
         description="Node-specific kernel parameters.",
     )
-    interfaces: dict[str, InterfaceConfig] | None = Field(
+    interfaces: dict[NameID, InterfaceConfig] | None = Field(
         default=None,
         description="Map of interface name to config (e.g. {'eth1': {network: 'lan1', ip: '10.0.0.1/24'}}).",
     )

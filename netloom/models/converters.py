@@ -168,7 +168,7 @@ class TopologyConverter:
                 InternalVLAN(
                     id=vlan.id,
                     parent=vlan.parent,
-                    name=vlan.name or f"{vlan.parent}.{vlan.id}",
+                    name=vlan.name or f"{vlan.parent}-{vlan.id}",
                     ip=vlan.ip,
                     gateway=vlan.gateway,
                 )

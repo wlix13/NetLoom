@@ -16,6 +16,7 @@ from ..core.enums import (
     VBoxChipset,
 )
 from ..core.errors import TopologyError
+from ..core.types import NameID
 
 
 class InternalVBoxSettings(BaseModel):
@@ -59,7 +60,7 @@ class InternalResources(BaseModel):
 class InternalInterface(BaseModel):
     """Internal interface representation."""
 
-    name: str
+    name: NameID
     """Interface name (eth1, eth2...)."""
 
     kind: InterfaceKind = InterfaceKind.PHYSICAL
@@ -99,7 +100,7 @@ class InternalInterface(BaseModel):
 class InternalBridge(BaseModel):
     """Internal representation of a bridge configuration."""
 
-    name: str = "br0"
+    name: NameID = "br0"
     """Bridge name."""
 
     stp: bool = False
@@ -128,11 +129,11 @@ class InternalVLAN(BaseModel):
     id: int
     """VLAN ID (1-4094)."""
 
-    parent: str
+    parent: NameID
     """Parent interface name (e.g., eth1)."""
 
-    name: str
-    """VLAN interface name (e.g., eth1.100)."""
+    name: NameID
+    """VLAN interface name (e.g., eth1-100)."""
 
     ip: str | None = None
     """IP address in CIDR notation."""
@@ -147,7 +148,7 @@ class InternalVLAN(BaseModel):
 class InternalTunnel(BaseModel):
     """Internal representation of an IP tunnel."""
 
-    name: str
+    name: NameID
     """Tunnel interface name."""
 
     type: TunnelType
