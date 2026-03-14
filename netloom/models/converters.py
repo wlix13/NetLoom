@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import re
+from pathlib import Path
 from typing import cast
 
+from ..core.enums import FirewallImpl, InterfaceKind, NodeRole
+from ..core.errors import TopologyError
+from ..core.mac import generate_mac
 from .config import (
     Node,
     Topology,
@@ -15,52 +18,54 @@ from .internal import (
     InternalFirewallRule,
     InternalInterface,
     InternalLink,
+    InternalNetwork,
     InternalNode,
     InternalOSPFArea,
+    InternalRIP,
     InternalRouting,
     InternalServices,
     InternalStaticRoute,
     InternalSysctl,
     InternalTopology,
+    InternalTunnel,
     InternalVBoxSettings,
+    InternalVLAN,
     InternalWireguard,
     InternalWireguardPeer,
-    ifname_to_vbox_adapter_index,
 )
-
-
-def _parse_static_route(route_str: str) -> InternalStaticRoute | None:
-    """Parse a static route string like '10.0.0.0/8 via 192.168.1.1'."""
-
-    # Pattern: destination via gateway
-    match = re.match(r"^(\S+)\s+via\s+(\S+)$", route_str.strip())
-    if match:
-        return InternalStaticRoute(destination=match.group(1), gateway=match.group(2))
-    return None
-
-
-def _generate_vbox_network_name(topo_id: str, node_a: str, node_b: str) -> str:
-    """Generate VirtualBox internal network name for a link."""
-
-    sorted_names = sorted([node_a, node_b])
-    return f"{topo_id}_{sorted_names[0]}_{sorted_names[1]}"
 
 
 class TopologyConverter:
     """Converts a Topology config to InternalTopology."""
 
-    def __init__(self, topology: Topology, workdir: str | None = None):
+    def __init__(self, topology: Topology, workdir: str | Path):
         self.topology = topology
-        self.workdir = workdir
-        self._interface_counters: dict[str, int] = {}
-        """Allocator for interface index per node (starts at 1 for eth1)."""
+        self.workdir = Path(workdir)
+        self._nic_allocations: dict[str, set[int]] = {}
 
-    def _next_interface_name(self, node_name: str) -> str:
-        """Get the next available interface name for a node."""
+    def _allocate_nic_index(self, node_name: str, ifname: str) -> int:
+        """Allocate a VirtualBox NIC index for an interface."""
 
-        idx = self._interface_counters.get(node_name, 1)
-        self._interface_counters[node_name] = idx + 1
-        return f"eth{idx}"
+        allocations = self._nic_allocations.setdefault(node_name, set())
+
+        # If name is ethN, try to force specific slot
+        if ifname.startswith("eth") and ifname[3:].isdigit():
+            # eth0 -> 1, eth1 -> 2
+            requested_idx = int(ifname[3:]) + 1
+            if requested_idx in allocations:
+                raise TopologyError(
+                    f"NIC index collision on node '{node_name}': Slot {requested_idx} (for {ifname}) is already used."
+                )
+            allocations.add(requested_idx)
+            return requested_idx
+
+        # For custom names, find first available slot
+        for i in range(1, 37):
+            if i not in allocations:
+                allocations.add(i)
+                return i
+
+        raise TopologyError(f"Node '{node_name}' has too many interfaces (max 36).")
 
     def _convert_vbox_settings(self) -> InternalVBoxSettings:
         """Convert VBox settings from defaults."""
@@ -93,7 +98,7 @@ class TopologyConverter:
             custom.update(node.sysctl)
 
         # Don't make users broke router by default :)
-        if node.role == "router":
+        if node.role == NodeRole.ROUTER:
             ip_forwarding = True
 
         return InternalSysctl(ip_forwarding=ip_forwarding, custom=custom)
@@ -106,13 +111,11 @@ class TopologyConverter:
 
         routing = node.routing
 
-        # Parse static routes
+        # Convert static routes
         static_routes: list[InternalStaticRoute] = []
         if routing.static:
-            for route_str in routing.static:
-                parsed = _parse_static_route(route_str)
-                if parsed:
-                    static_routes.append(parsed)
+            for route in routing.static:
+                static_routes.append(InternalStaticRoute(destination=route.destination, gateway=route.gateway))
 
         # Convert OSPF areas
         ospf_areas: list[InternalOSPFArea] = []
@@ -125,9 +128,24 @@ class TopologyConverter:
                         InternalOSPFArea(
                             id=area.id,
                             interfaces=area.interfaces or [],
+                            hello=area.hello,
+                            dead=area.dead,
+                            cost=area.cost,
+                            retransmit=area.retransmit,
                         )
                     )
-        # NOTE: New routing engine support will be added later.
+
+        # Convert RIP configuration
+        rip = None
+        if routing.rip and routing.rip.enabled:
+            rip = InternalRIP(
+                enabled=routing.rip.enabled,
+                version=routing.rip.version,
+                interfaces=routing.rip.interfaces or [],
+                update_time=routing.rip.update_time,
+                timeout_time=routing.rip.timeout_time,
+                garbage_time=routing.rip.garbage_time,
+            )
 
         return InternalRouting(
             engine=routing.engine,
@@ -135,8 +153,47 @@ class TopologyConverter:
             static_routes=static_routes,
             ospf_enabled=ospf_enabled,
             ospf_areas=ospf_areas,
+            rip=rip,
             configured=routing.configured,
         )
+
+    def _convert_vlans(self, node: Node) -> list[InternalVLAN]:
+        """Convert VLAN configs to internal format."""
+
+        if not node.vlans:
+            return []
+
+        vlans: list[InternalVLAN] = []
+        for vlan in node.vlans:
+            vlans.append(
+                InternalVLAN(
+                    id=vlan.id,
+                    parent=vlan.parent,
+                    name=vlan.name or f"{vlan.parent}-{vlan.id}",
+                    ip=vlan.ip,
+                    gateway=vlan.gateway,
+                )
+            )
+        return vlans
+
+    def _convert_tunnels(self, node: Node) -> list[InternalTunnel]:
+        """Convert tunnel configs to internal format."""
+
+        if not node.tunnels:
+            return []
+
+        tunnels: list[InternalTunnel] = []
+        for tunnel in node.tunnels:
+            tunnels.append(
+                InternalTunnel(
+                    name=tunnel.name,
+                    type=tunnel.type,
+                    local=tunnel.local,
+                    remote=tunnel.remote,
+                    ip=tunnel.ip,
+                )
+            )
+        return tunnels
 
     def _convert_services(self, node: Node) -> InternalServices | None:
         """Convert services config to internal format."""
@@ -159,6 +216,7 @@ class TopologyConverter:
                                 public_key=peer.public_key,
                                 allowed_ips=peer.allowed_ips,
                                 endpoint=peer.endpoint,
+                                keepalive=peer.keepalive,
                             )
                         )
             if wg.listen_port and wg.address:
@@ -185,7 +243,7 @@ class TopologyConverter:
                     )
                 )
             firewall = InternalFirewall(
-                impl=fw.impl or "nftables",
+                impl=fw.impl or FirewallImpl.NFTABLES,
                 rules=rules,
             )
 
@@ -195,21 +253,47 @@ class TopologyConverter:
             firewall=firewall,
         )
 
-    def _convert_bridge(self, node: Node, interfaces: list[InternalInterface]) -> InternalBridge | None:
-        """Convert bridge config and associate interfaces."""
+    def _convert_bridges(
+        self,
+        node: Node,
+        interfaces: list[InternalInterface],
+        vlans: list[InternalVLAN],
+    ) -> list[InternalBridge]:
+        """Convert bridge configs and assign bridge_name to member interfaces/VLANs."""
 
-        if not node.bridge:
-            return None
+        if not node.bridges:
+            return []
 
-        bridge = node.bridge
-        interface_names = [iface.name for iface in interfaces]
+        iface_map = {iface.name: iface for iface in interfaces}
+        vlan_map = {vlan.name: vlan for vlan in vlans}
+        result: list[InternalBridge] = []
 
-        return InternalBridge(
-            name=bridge.name,
-            stp=bridge.stp,
-            interfaces=interface_names,
-            configured=bridge.configured,
-        )
+        for bridge_cfg in node.bridges:
+            if bridge_cfg.members is not None:
+                member_names = bridge_cfg.members
+            else:
+                member_names = [iface.name for iface in interfaces if iface.kind != InterfaceKind.LOOPBACK]
+
+            for name in member_names:
+                if name in iface_map:
+                    iface_map[name].bridge_name = bridge_cfg.name
+                elif name in vlan_map:
+                    vlan_map[name].bridge_name = bridge_cfg.name
+                else:
+                    raise TopologyError(
+                        f"Bridge '{bridge_cfg.name}' on node '{node.name}' references unknown member '{name}'."
+                    )
+
+            result.append(
+                InternalBridge(
+                    name=bridge_cfg.name,
+                    stp=bridge_cfg.stp,
+                    interfaces=member_names,
+                    configured=bridge_cfg.configured,
+                )
+            )
+
+        return result
 
     def convert(self) -> InternalTopology:
         """Convert the topology to internal representation."""
@@ -217,82 +301,123 @@ class TopologyConverter:
         topo = self.topology
         topo_id = topo.meta.id
 
-        # First pass: assign interfaces based on links
-        # Track which interfaces belong to which node
+        # Build network_name -> [(node_name, iface_name)] mapping
+        network_participants: dict[str, list[tuple[str, str]]] = {net.name: [] for net in topo.networks}
+
+        for node in topo.nodes:
+            if not node.interfaces:
+                continue
+            for iface_name, iface_config in node.interfaces.items():
+                net_name = iface_config.network
+                if net_name is None:
+                    continue  # standalone interfaces (e.g. loopback) handled separately
+                if net_name not in network_participants:
+                    raise TopologyError(
+                        f"Interface '{iface_name}' on node '{node.name}' references unknown network '{net_name}'."
+                    )
+                network_participants[net_name].append((node.name, iface_name))
+
+        # Build per-node interface lists, internal links, and internal networks
         node_interfaces: dict[str, list[InternalInterface]] = {node.name: [] for node in topo.nodes}
         internal_links: list[InternalLink] = []
+        internal_networks: list[InternalNetwork] = []
 
-        for link in topo.links:
-            node_a, node_b = link.endpoints
-
-            iface_a = self._next_interface_name(node_a)
-            iface_b = self._next_interface_name(node_b)
-
-            vbox_net = _generate_vbox_network_name(topo_id, node_a, node_b)
-
-            internal_links.append(
-                InternalLink(
-                    node_a=node_a,
-                    node_b=node_b,
-                    interface_a=iface_a,
-                    interface_b=iface_b,
-                    vbox_network_name=vbox_net,
+        for net_name, participants in network_participants.items():
+            vbox_net = f"{topo_id}_{net_name}"
+            internal_networks.append(
+                InternalNetwork(
+                    name=net_name,
+                    network=vbox_net,
+                    participants=participants,
                 )
             )
 
-            node_interfaces[node_a].append(
-                InternalInterface(
-                    name=iface_a,
-                    vbox_nic_index=ifname_to_vbox_adapter_index(iface_a),
-                    peer_node=node_b,
-                    vbox_network_name=vbox_net,
-                )
-            )
-            node_interfaces[node_b].append(
-                InternalInterface(
-                    name=iface_b,
-                    vbox_nic_index=ifname_to_vbox_adapter_index(iface_b),
-                    peer_node=node_a,
-                    vbox_network_name=vbox_net,
-                )
-            )
+            for node_name, iface_name in participants:
+                participant_node = topo.get_node(node_name)
+                if participant_node is None or participant_node.interfaces is None:
+                    continue
+                iface_config = participant_node.interfaces[iface_name]
 
-        # Second pass: merge interface configs from nodes
+                mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node_name}-{iface_name}")
+                vbox_nic_index = self._allocate_nic_index(node_name, iface_name)
+
+                peer_node: str | None = None
+                if len(participants) == 2:
+                    other = next(((pn, pi) for pn, pi in participants if (pn, pi) != (node_name, iface_name)), None)
+                    peer_node = other[0] if other else None
+
+                node_interfaces[node_name].append(
+                    InternalInterface(
+                        name=iface_name,
+                        kind=iface_config.kind,
+                        mac_address=mac,
+                        ip=iface_config.ip,
+                        gateway=iface_config.gateway,
+                        dhcp=iface_config.dhcp,
+                        mtu=iface_config.mtu,
+                        vbox_nic_index=vbox_nic_index,
+                        network=vbox_net,
+                        peer_node=peer_node,
+                        configured=iface_config.configured,
+                    )
+                )
+
+            if len(participants) == 2:
+                (node_a, iface_a), (node_b, iface_b) = participants
+                internal_links.append(
+                    InternalLink(
+                        node_a=node_a,
+                        node_b=node_b,
+                        interface_a=iface_a,
+                        interface_b=iface_b,
+                        network=vbox_net,
+                    )
+                )
+
+        # Add standalone interfaces (no network, e.g. loopback)
         for node in topo.nodes:
-            if node.interfaces:
-                interfaces = node_interfaces[node.name]
-                for idx, iface_config in enumerate(node.interfaces):
-                    if idx < len(interfaces):
-                        # Update the interface with config values
-                        interfaces[idx].ip = iface_config.ip
-                        interfaces[idx].gateway = iface_config.gateway
-                        interfaces[idx].configured = iface_config.configured
+            if not node.interfaces:
+                continue
+            for iface_name, iface_config in node.interfaces.items():
+                if iface_config.network is not None:
+                    continue
+                node_interfaces[node.name].append(
+                    InternalInterface(
+                        name=iface_name,
+                        kind=iface_config.kind,
+                        ip=iface_config.ip,
+                        gateway=iface_config.gateway,
+                        dhcp=iface_config.dhcp,
+                        mtu=iface_config.mtu,
+                        configured=iface_config.configured,
+                    )
+                )
 
-        # Third pass: build internal nodes
+        # Build internal nodes
         internal_nodes: list[InternalNode] = []
         for node in topo.nodes:
             interfaces = node_interfaces.get(node.name, [])
+            vlans = self._convert_vlans(node)
 
-            # Set config directories if workdir is provided
-            config_dir = None
-            saved_configs_dir = None
-            if self.workdir:
-                config_dir = f"{self.workdir}/configs/{node.name}"
-                saved_configs_dir = f"{self.workdir}/saved/{node.name}"
+            config_dir = f"{self.workdir}/configs/{node.name}"
+            saved_configs_dir = f"{self.workdir}/saved/{node.name}"
 
-            internal_node = InternalNode(
-                name=node.name,
-                role=node.role,
-                interfaces=interfaces,
-                bridge=self._convert_bridge(node, interfaces),
-                sysctl=self._convert_sysctl(node),
-                routing=self._convert_routing(node),
-                services=self._convert_services(node),
-                commands=node.commands or [],
-                config_dir=config_dir,
-                saved_configs_dir=saved_configs_dir,
+            internal_nodes.append(
+                InternalNode(
+                    name=node.name,
+                    role=node.role,
+                    interfaces=interfaces,
+                    vlans=vlans,
+                    tunnels=self._convert_tunnels(node),
+                    bridges=self._convert_bridges(node, interfaces, vlans),
+                    sysctl=self._convert_sysctl(node),
+                    routing=self._convert_routing(node),
+                    services=self._convert_services(node),
+                    commands=node.commands or [],
+                    config_dir=config_dir,
+                    saved_configs_dir=saved_configs_dir,
+                )
             )
-            internal_nodes.append(internal_node)
 
         return InternalTopology(
             id=topo_id,
@@ -300,11 +425,12 @@ class TopologyConverter:
             description=topo.meta.description,
             vbox=self._convert_vbox_settings(),
             nodes=internal_nodes,
+            networks=internal_networks,
             links=internal_links,
         )
 
 
-def convert_topology(topology: Topology, workdir: str | None = None) -> InternalTopology:
+def convert_topology(topology: Topology, workdir: str | Path) -> InternalTopology:
     """Convert a Topology config to InternalTopology."""
 
     converter = TopologyConverter(topology, workdir=workdir)

@@ -1,0 +1,8 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("VLAN interface " ~ vlan.name ~ " on " ~ node.name) }}
+[NetDev]
+Name={{ vlan.name }}
+Kind=vlan
+
+[VLAN]
+Id={{ vlan.id }}

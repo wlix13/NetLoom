@@ -1,0 +1,13 @@
+{% import "_base/_macros.j2" as macros -%}
+{{ macros.comment("Bridge interface " ~ bridge.name ~ " on " ~ node.name) }}
+[NetDev]
+Name={{ bridge.name }}
+Kind=bridge
+
+[Bridge]
+{% if bridge.stp -%}
+STP=yes
+{% else -%}
+STP=no
+{% endif -%}
+ForwardDelay=2

@@ -4,19 +4,28 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-
-NicModel = Literal["virtio", "e1000", "rtl8139"]
-ParavirtProvider = Literal["default", "legacy", "minimal", "hyperv", "kvm", "none"]
-VBoxChipset = Literal["piix3", "ich9"]
+from ..core.enums import (
+    FirewallAction,
+    FirewallImpl,
+    InterfaceKind,
+    NicModel,
+    NodeRole,
+    ParavirtProvider,
+    RoutingEngine,
+    TunnelType,
+    VBoxChipset,
+)
+from ..core.errors import TopologyError
+from ..core.types import NameID
 
 
 class InternalVBoxSettings(BaseModel):
     """VirtualBox-specific VM settings."""
 
-    paravirt_provider: ParavirtProvider = "kvm"
+    paravirt_provider: ParavirtProvider = ParavirtProvider.KVM
     """Paravirtualization provider."""
 
-    chipset: VBoxChipset = "ich9"
+    chipset: VBoxChipset = VBoxChipset.ICH9
     """Chipset type."""
 
     ioapic: bool = True
@@ -41,7 +50,7 @@ class InternalResources(BaseModel):
     cpu: int = 1
     """CPU count."""
 
-    ram_mb: int = 128
+    ram_mb: int = 512
     """RAM in MB."""
 
     disk_gb: int = 8
@@ -49,34 +58,49 @@ class InternalResources(BaseModel):
 
 
 class InternalInterface(BaseModel):
-    """Internal representation of a network interface."""
+    """Internal interface representation."""
 
-    name: str
-    """Interface name (e.g., eth1, eth2)."""
+    name: NameID
+    """Interface name (eth1, eth2...)."""
 
-    vbox_nic_index: int = Field(ge=1, le=20)
-    """VirtualBox NIC adapter index (1-20)."""
+    kind: InterfaceKind = InterfaceKind.PHYSICAL
+    """Interface kind. Loopback interfaces have no VirtualBox NIC and no MAC."""
 
-    peer_node: str | None = None
-    """Name of the peer node connected via this interface."""
+    mac_address: str | None = None
+    """MAC address."""
 
     ip: str | None = None
-    """IP address in CIDR notation."""
+    """IP address."""
 
     gateway: str | None = None
-    """Gateway IP address."""
+    """Gateway IP."""
+
+    vbox_nic_index: int | None = None
+    """VirtualBox NIC index."""
+
+    network: str | None = None
+    """VirtualBox internal network name (acts as L2 switch)."""
+
+    dhcp: bool = False
+    """Enable DHCP on this interface."""
+
+    mtu: int | None = None
+    """MTU override (None = OS default)."""
+
+    peer_node: str | None = None
+    """Connected peer node name."""
+
+    bridge_name: str | None = None
+    """Name of the bridge this interface is a port of, if any."""
 
     configured: bool = True
-    """Whether to generate config for this interface."""
-
-    vbox_network_name: str | None = None
-    """VirtualBox internal network name."""
+    """Whether to generate config."""
 
 
 class InternalBridge(BaseModel):
     """Internal representation of a bridge configuration."""
 
-    name: str = "br0"
+    name: NameID = "br0"
     """Bridge name."""
 
     stp: bool = False
@@ -99,6 +123,47 @@ class InternalStaticRoute(BaseModel):
     """Next-hop gateway IP."""
 
 
+class InternalVLAN(BaseModel):
+    """Internal representation of a VLAN interface."""
+
+    id: int
+    """VLAN ID (1-4094)."""
+
+    parent: NameID
+    """Parent interface name (e.g., eth1)."""
+
+    name: NameID
+    """VLAN interface name (e.g., eth1-100)."""
+
+    ip: str | None = None
+    """IP address in CIDR notation."""
+
+    gateway: str | None = None
+    """Gateway IP address."""
+
+    bridge_name: str | None = None
+    """Name of the bridge this VLAN interface is a port of, if any."""
+
+
+class InternalTunnel(BaseModel):
+    """Internal representation of an IP tunnel."""
+
+    name: NameID
+    """Tunnel interface name."""
+
+    type: TunnelType
+    """Tunnel type."""
+
+    local: str
+    """Local endpoint IP address."""
+
+    remote: str
+    """Remote endpoint IP address."""
+
+    ip: str | None = None
+    """IP address in CIDR notation for the tunnel interface."""
+
+
 class InternalOSPFArea(BaseModel):
     """Internal OSPF area configuration."""
 
@@ -108,11 +173,45 @@ class InternalOSPFArea(BaseModel):
     interfaces: list[str] = Field(default_factory=list)
     """Interfaces in this area."""
 
+    hello: int = 10
+    """Hello interval in seconds."""
+
+    dead: int = 40
+    """Dead interval in seconds."""
+
+    cost: int = 10
+    """Interface cost."""
+
+    retransmit: int = 5
+    """Retransmit interval in seconds."""
+
+
+class InternalRIP(BaseModel):
+    """Internal RIP routing configuration."""
+
+    enabled: bool = False
+    """RIP enabled."""
+
+    version: Literal[1, 2] = 2
+    """RIP version."""
+
+    interfaces: list[str] = Field(default_factory=list)
+    """Interfaces participating in RIP."""
+
+    update_time: int = 30
+    """Update interval in seconds."""
+
+    timeout_time: int = 180
+    """Timeout in seconds."""
+
+    garbage_time: int = 120
+    """Garbage collection time in seconds."""
+
 
 class InternalRouting(BaseModel):
     """Internal routing configuration."""
 
-    engine: Literal["bird", "frr", "none"] | None = None
+    engine: RoutingEngine | None = None
     """Routing engine."""
 
     router_id: str | None = None
@@ -126,6 +225,9 @@ class InternalRouting(BaseModel):
 
     ospf_areas: list[InternalOSPFArea] = Field(default_factory=list)
     """OSPF areas."""
+
+    rip: InternalRIP | None = None
+    """RIP configuration."""
 
     configured: bool = True
     """Whether to generate config for this routing."""
@@ -142,6 +244,9 @@ class InternalWireguardPeer(BaseModel):
 
     endpoint: str | None = None
     """Endpoint."""
+
+    keepalive: int = 25
+    """PersistentKeepalive interval in seconds."""
 
 
 class InternalWireguard(BaseModel):
@@ -163,7 +268,7 @@ class InternalWireguard(BaseModel):
 class InternalFirewallRule(BaseModel):
     """Internal firewall rule."""
 
-    action: Literal["accept", "drop", "reject"]
+    action: FirewallAction
     """Action."""
 
     src: str | None = None
@@ -182,7 +287,7 @@ class InternalFirewallRule(BaseModel):
 class InternalFirewall(BaseModel):
     """Internal firewall configuration."""
 
-    impl: Literal["nftables"] = "nftables"
+    impl: FirewallImpl
     """Engine implementation."""
 
     rules: list[InternalFirewallRule] = Field(default_factory=list)
@@ -218,7 +323,7 @@ class InternalNode(BaseModel):
     name: str
     """Node name."""
 
-    role: Literal["router", "switch", "host"]
+    role: NodeRole
     """Node role."""
 
     resources: InternalResources = Field(default_factory=InternalResources)
@@ -227,7 +332,7 @@ class InternalNode(BaseModel):
     image: str | None = None
     """Image."""
 
-    nic_model: NicModel = "virtio"
+    nic_model: NicModel = NicModel.VIRTIO
     """NIC implementation."""
 
     vbox: InternalVBoxSettings | None = None
@@ -236,8 +341,14 @@ class InternalNode(BaseModel):
     interfaces: list[InternalInterface] = Field(default_factory=list)
     """Network interfaces."""
 
-    bridge: InternalBridge | None = None
-    """Bridge configuration."""
+    vlans: list[InternalVLAN] = Field(default_factory=list)
+    """VLAN interfaces."""
+
+    tunnels: list[InternalTunnel] = Field(default_factory=list)
+    """IP tunnels."""
+
+    bridges: list[InternalBridge] = Field(default_factory=list)
+    """Bridge configurations."""
 
     sysctl: InternalSysctl = Field(default_factory=InternalSysctl)
     """Kernel parameters."""
@@ -258,6 +369,19 @@ class InternalNode(BaseModel):
     """Directory for saved configs pulled from config-drive."""
 
 
+class InternalNetwork(BaseModel):
+    """Internal representation of a shared L2 network (VirtualBox internal network)."""
+
+    name: str
+    """User-defined network name."""
+
+    network: str
+    """VirtualBox internal network name (acts as L2 switch)."""
+
+    participants: list[tuple[str, str]] = Field(default_factory=list)
+    """List of (node_name, interface_name) pairs connected to this network."""
+
+
 class InternalLink(BaseModel):
     """Internal representation of a link between two nodes."""
 
@@ -272,8 +396,8 @@ class InternalLink(BaseModel):
     interface_b: str
     """Interface name on node_b (e.g., eth1)."""
 
-    vbox_network_name: str
-    """VirtualBox internal network name for this link."""
+    network: str
+    """VirtualBox internal network name for this link (acts as L2 switch)."""
 
 
 class InternalTopology(BaseModel):
@@ -294,8 +418,11 @@ class InternalTopology(BaseModel):
     nodes: list[InternalNode] = Field(default_factory=list)
     """List of nodes."""
 
+    networks: list[InternalNetwork] = Field(default_factory=list)
+    """List of L2 networks (including multi-access)."""
+
     links: list[InternalLink] = Field(default_factory=list)
-    """List of links."""
+    """List of point-to-point links (networks with exactly 2 participants)."""
 
     # Internal indexes for fast lookup
     _node_index: dict[str, InternalNode] = PrivateAttr(default_factory=dict)
@@ -318,7 +445,10 @@ class InternalTopology(BaseModel):
     def get_node(self, name: str) -> InternalNode:
         """Get a node by name."""
 
-        return self._node_index[name]
+        try:
+            return self._node_index[name]
+        except KeyError:
+            raise TopologyError(f"Node '{name}' not found in topology") from None
 
     def get_node_links(self, node_name: str) -> list[InternalLink]:
         """Get all links for a node."""

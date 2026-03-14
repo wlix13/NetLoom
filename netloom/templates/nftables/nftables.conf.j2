@@ -1,0 +1,72 @@
+{% import "_base/_macros.j2" as macros -%}
+{% if node.services and node.services.firewall -%}
+{{ macros.section_header("nftables firewall configuration for " ~ node.name) }}
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Allow established and related connections
+        ct state established,related accept
+
+        # Allow loopback
+        iif "lo" accept
+
+        # Allow ICMP (ping)
+        ip protocol icmp accept
+        ip6 nexthdr icmpv6 accept
+
+{% for rule in node.services.firewall.rules -%}
+{# --- Build match parts independently so all attributes are always combined --- #}
+{%- set ns = namespace(match_parts=[]) -%}
+{%- if rule.src and rule.src != "0.0.0.0/0" -%}
+  {%- set ns.match_parts = ns.match_parts + ["ip saddr " ~ rule.src] -%}
+{%- endif -%}
+{%- if rule.dst and rule.dst != "0.0.0.0/0" -%}
+  {%- set ns.match_parts = ns.match_parts + ["ip daddr " ~ rule.dst] -%}
+{%- endif -%}
+{%- if rule.proto -%}
+  {%- if rule.dport -%}
+    {%- set ns.match_parts = ns.match_parts + [rule.proto ~ " dport " ~ rule.dport] -%}
+  {%- elif rule.proto == "icmp" -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip protocol icmp"] -%}
+  {%- elif rule.proto == "icmpv6" -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip6 nexthdr icmpv6"] -%}
+  {%- else -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip protocol " ~ rule.proto] -%}
+  {%- endif -%}
+{%- endif -%}
+{# --- Build human-readable comment --- #}
+{%- set ns2 = namespace(desc=[]) -%}
+{%- if rule.src %}{%- set ns2.desc = ns2.desc + ["from " ~ rule.src] -%}{%- endif -%}
+{%- if rule.dst %}{%- set ns2.desc = ns2.desc + ["to " ~ rule.dst] -%}{%- endif -%}
+{%- if rule.proto and rule.dport %}{%- set ns2.desc = ns2.desc + [rule.proto ~ "/" ~ rule.dport] -%}
+{%- elif rule.proto %}{%- set ns2.desc = ns2.desc + [rule.proto] -%}{%- endif -%}
+        # {{ rule.action | capitalize }} traffic{% if ns2.desc %} {{ ns2.desc | join(" ") }}{% endif %}
+
+{%- if not ns.match_parts and rule.action == "drop" %}
+        # (default drop policy handles this)
+{%- else %}
+        {{ ns.match_parts | join(" ") }} {{ rule.action }}
+{%- endif %}
+{% endfor -%}
+
+        # Log and drop everything else
+        log prefix "nftables-dropped: " drop
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Allow established and related connections
+        ct state established,related accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+{% endif %}
