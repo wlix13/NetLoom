@@ -3,8 +3,10 @@
 [Match]
 Name={{ iface.name }}
 
+{% if iface.mtu -%}
 [Link]
-MTUBytes={{ iface.mtu if iface.mtu else 1500 }}
+MTUBytes={{ iface.mtu }}
+{% endif -%}
 
 [Network]
 {% if iface.dhcp -%}

@@ -20,32 +20,38 @@ table inet filter {
         ip6 nexthdr icmpv6 accept
 
 {% for rule in node.services.firewall.rules -%}
-{% if rule.action == "accept" -%}
-{% if rule.proto == "icmp" -%}
-        # Accept ICMP
-        ip protocol icmp accept
-{% elif rule.proto and rule.dport -%}
-        # Accept {{ rule.proto }} port {{ rule.dport }}{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
-        {% if rule.src %}ip saddr {{ rule.src }} {% endif %}{% if rule.dst %}ip daddr {{ rule.dst }} {% endif %}{{ rule.proto }} dport {{ rule.dport }} accept
-{% elif rule.src or rule.dst -%}
-        # Accept traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
-        {% if rule.src %}ip saddr {{ rule.src }} {% endif %}{% if rule.dst %}ip daddr {{ rule.dst }} {% endif %}accept
-{% endif -%}
-{% elif rule.action == "drop" -%}
-{% if rule.src == "0.0.0.0/0" -%}
-        # Drop all other traffic (default drop policy handles this)
-{% elif rule.src or rule.dst -%}
-        # Drop traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}
-        {% if rule.src %}ip saddr {{ rule.src }} {% endif %}{% if rule.dst %}ip daddr {{ rule.dst }} {% endif %}drop
-{% endif -%}
-{% elif rule.action == "reject" -%}
-        # Reject traffic{% if rule.src %} from {{ rule.src }}{% endif %}{% if rule.dst %} to {{ rule.dst }}{% endif %}{% if rule.proto and rule.dport %} {{ rule.proto }}/{{ rule.dport }}{% endif %}
-{% if rule.proto and rule.dport -%}
-        {% if rule.src %}ip saddr {{ rule.src }} {% endif %}{% if rule.dst %}ip daddr {{ rule.dst }} {% endif %}{{ rule.proto }} dport {{ rule.dport }} reject
-{% elif rule.src or rule.dst -%}
-        {% if rule.src %}ip saddr {{ rule.src }} {% endif %}{% if rule.dst %}ip daddr {{ rule.dst }} {% endif %}reject
-{% endif -%}
-{% endif -%}
+{# --- Build match parts independently so all attributes are always combined --- #}
+{%- set ns = namespace(match_parts=[]) -%}
+{%- if rule.src and rule.src != "0.0.0.0/0" -%}
+  {%- set ns.match_parts = ns.match_parts + ["ip saddr " ~ rule.src] -%}
+{%- endif -%}
+{%- if rule.dst and rule.dst != "0.0.0.0/0" -%}
+  {%- set ns.match_parts = ns.match_parts + ["ip daddr " ~ rule.dst] -%}
+{%- endif -%}
+{%- if rule.proto -%}
+  {%- if rule.dport -%}
+    {%- set ns.match_parts = ns.match_parts + [rule.proto ~ " dport " ~ rule.dport] -%}
+  {%- elif rule.proto == "icmp" -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip protocol icmp"] -%}
+  {%- elif rule.proto == "icmpv6" -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip6 nexthdr icmpv6"] -%}
+  {%- else -%}
+    {%- set ns.match_parts = ns.match_parts + ["ip protocol " ~ rule.proto] -%}
+  {%- endif -%}
+{%- endif -%}
+{# --- Build human-readable comment --- #}
+{%- set ns2 = namespace(desc=[]) -%}
+{%- if rule.src %}{%- set ns2.desc = ns2.desc + ["from " ~ rule.src] -%}{%- endif -%}
+{%- if rule.dst %}{%- set ns2.desc = ns2.desc + ["to " ~ rule.dst] -%}{%- endif -%}
+{%- if rule.proto and rule.dport %}{%- set ns2.desc = ns2.desc + [rule.proto ~ "/" ~ rule.dport] -%}
+{%- elif rule.proto %}{%- set ns2.desc = ns2.desc + [rule.proto] -%}{%- endif -%}
+        # {{ rule.action | capitalize }} traffic{% if ns2.desc %} {{ ns2.desc | join(" ") }}{% endif %}
+
+{%- if not ns.match_parts and rule.action == "drop" %}
+        # (default drop policy handles this)
+{%- else %}
+        {{ ns.match_parts | join(" ") }} {{ rule.action }}
+{%- endif %}
 {% endfor -%}
 
         # Log and drop everything else
