@@ -122,7 +122,8 @@
                     "type": "string",
                     "description": "Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated deterministically if omitted."
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
