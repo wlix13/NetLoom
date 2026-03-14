@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import orjson
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from jinja2.exceptions import TemplateError
+from jinja2.exceptions import TemplateNotFound
 
 from ..core.controller import BaseController
 from ..core.enums import InterfaceKind, RoutingEngine, TemplateSet
@@ -236,6 +236,7 @@ class ConfigController(BaseController["Application"]):
 
         relative = self._OUTPUT_PATHS.get(template_stem)
         if relative is None:
+            self.console.print(f"[yellow]Warning: no output path mapping for template '{template_stem}'[/yellow]")
             return None
         return outdir / relative
 
@@ -252,7 +253,7 @@ class ConfigController(BaseController["Application"]):
             content = template.render(node=node)
             if content.strip():
                 (outdir / "services.list").write_text(content, encoding="utf-8", newline="\n")
-        except TemplateError:
+        except TemplateNotFound:
             services = []
 
             # systemd-networkd for any network configuration
