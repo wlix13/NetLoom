@@ -46,8 +46,10 @@ def format_fat16(flat_path: Path, size_mb: int) -> None:
     """Format raw flat VMDK file as FAT16."""
 
     d = disk(str(flat_path), "r+b")
-    mkfat.fat_mkfs(d, size_mb * MB, params={"fat_bits": FAT_BITS})
-    d.close()
+    try:
+        mkfat.fat_mkfs(d, size_mb * MB, params={"fat_bits": FAT_BITS})
+    finally:
+        d.close()
 
 
 def makedirs(fs: Any, rel_path: Path) -> Any:

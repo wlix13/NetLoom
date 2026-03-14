@@ -31,8 +31,10 @@ class ConfigDrive:
                     parent_dir = makedirs(fs, rel_path.parent)
                     content = src_path.read_bytes()
                     f = parent_dir.create(rel_path.name)
-                    f.write(content)
-                    f.close()
+                    try:
+                        f.write(content)
+                    finally:
+                        f.close()
 
     def copy_out(self, dst_dir: Path) -> list[Path]:
         """Copy all files from this config-drive to local directory."""
