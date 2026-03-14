@@ -18,7 +18,7 @@ class Application:
 
     def __init__(self) -> None:
         self._console = Console()
-        self._workdir: Path | None = None
+        self._workdir: Path = Path()
         self._debug: bool = True
         self.vbox_settings: VBoxSettings = VBoxSettings()
 
@@ -42,12 +42,12 @@ class Application:
         return self._console
 
     @property
-    def workdir(self) -> Path | None:
+    def workdir(self) -> Path:
         return self._workdir
 
     @workdir.setter
-    def workdir(self, value: Path | str | None) -> None:
-        self._workdir = Path(value) if value else None
+    def workdir(self, value: Path | str) -> None:
+        self._workdir = Path(value)
 
     @property
     def debug(self) -> bool:

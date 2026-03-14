@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 
 from ..core.enums import FirewallImpl, InterfaceKind, NodeRole
@@ -37,9 +38,9 @@ from .internal import (
 class TopologyConverter:
     """Converts a Topology config to InternalTopology."""
 
-    def __init__(self, topology: Topology, workdir: str | None = None):
+    def __init__(self, topology: Topology, workdir: str | Path):
         self.topology = topology
-        self.workdir = workdir
+        self.workdir = Path(workdir)
         self._nic_allocations: dict[str, set[int]] = {}
 
     def _allocate_nic_index(self, node_name: str, ifname: str) -> int:
@@ -394,11 +395,8 @@ class TopologyConverter:
             interfaces = node_interfaces.get(node.name, [])
             vlans = self._convert_vlans(node)
 
-            config_dir = None
-            saved_configs_dir = None
-            if self.workdir:
-                config_dir = f"{self.workdir}/configs/{node.name}"
-                saved_configs_dir = f"{self.workdir}/saved/{node.name}"
+            config_dir = f"{self.workdir}/configs/{node.name}"
+            saved_configs_dir = f"{self.workdir}/saved/{node.name}"
 
             internal_nodes.append(
                 InternalNode(
@@ -428,7 +426,7 @@ class TopologyConverter:
         )
 
 
-def convert_topology(topology: Topology, workdir: str | None = None) -> InternalTopology:
+def convert_topology(topology: Topology, workdir: str | Path) -> InternalTopology:
     """Convert a Topology config to InternalTopology."""
 
     converter = TopologyConverter(topology, workdir=workdir)
