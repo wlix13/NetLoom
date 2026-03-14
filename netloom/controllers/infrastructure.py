@@ -124,6 +124,8 @@ class InfrastructureController(BaseController["Application"]):
         """Ensure the base VM is imported from OVA and has a snapshot."""
 
         if self._s.base_vm_name in self._vbox.list_vms():
+            if not self._has_snapshot(self._s.base_vm_name, self._s.snapshot_name):
+                self._vbox.take_snapshot(self._s.base_vm_name, self._s.snapshot_name)
             return
 
         if not self._s.ova_path:
@@ -252,6 +254,8 @@ class InfrastructureController(BaseController["Application"]):
                     pass
                 self._create_configdrive(cfg_vmdk)
 
+            # we don't need to _ensure_sata_storage_controller(node.name)
+            # as it was ensured at init phase
             # attach at SATA port 1 (port 0 is the OS disk from the clone)
             self._vbox.storage_attach(
                 node.name,
