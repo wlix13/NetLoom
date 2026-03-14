@@ -279,6 +279,10 @@ class TopologyConverter:
                     iface_map[name].bridge_name = bridge_cfg.name
                 elif name in vlan_map:
                     vlan_map[name].bridge_name = bridge_cfg.name
+                else:
+                    raise TopologyError(
+                        f"Bridge '{bridge_cfg.name}' on node '{node.name}' references unknown member '{name}'."
+                    )
 
             result.append(
                 InternalBridge(
