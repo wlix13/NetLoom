@@ -1,7 +1,5 @@
 """Rich display helpers for topology visualization."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from rich.box import ROUNDED
@@ -30,7 +28,7 @@ def node_label(name: str, role: str, *, with_role: bool = True) -> str:
 
 
 def render_map(internal: InternalTopology, console: Console) -> None:
-    """Render a network-centric connectivity table."""
+    """Render network-centric connectivity table."""
 
     table = Table(box=ROUNDED, show_header=True, border_style="dim", expand=False)
     table.add_column("Network", style="cyan bold", no_wrap=True, min_width=12)
@@ -65,14 +63,16 @@ def render_map(internal: InternalTopology, console: Console) -> None:
 
 
 def render_graph(internal: InternalTopology, console: Console) -> None:
-    """Render a BFS tree diagram of the topology using Rich Tree."""
+    """Render a BFS tree diagram of the topology."""
 
     adjacency: dict[str, list[tuple[str, str]]] = {n.name: [] for n in internal.nodes}
+    network_labels = {network.network: network.name for network in internal.networks}
     for link in internal.links:
-        adjacency[link.node_a].append((link.node_b, link.network))
-        adjacency[link.node_b].append((link.node_a, link.network))
+        label = network_labels.get(link.network, link.network)
+        adjacency[link.node_a].append((link.node_b, label))
+        adjacency[link.node_b].append((link.node_a, label))
     for network in internal.networks:
-        if len(network.participants) > 2:  # noqa: PLR2004
+        if len(network.participants) > 2:
             for node_a, _ in network.participants:
                 for node_b, _ in network.participants:
                     if node_b != node_a:

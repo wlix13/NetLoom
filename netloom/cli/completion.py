@@ -1,6 +1,5 @@
 """Shell completion installation command."""
 
-import sys
 from pathlib import Path
 
 import rich_click as click
@@ -59,7 +58,7 @@ def install_completion(obj: dict | None, install_shell: str | None) -> None:
             app.console.print(f"[red]Error: {e}[/red]")
             app.console.print(f"[yellow]Add manually to {config_file}:[/yellow]")
             app.console.print(f"  {completion_line}")
-            sys.exit(1)
+            raise click.ClickException("Completion installation failed.")
     else:
         app.console.print("[bold]Shell Completion Setup[/bold]\n")
         app.console.print("Add one of the following to your shell config:\n")

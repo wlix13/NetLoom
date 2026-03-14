@@ -34,7 +34,7 @@ def _file_completions(incomplete: str, extensions: set[str]) -> list[CompletionI
                 completions.append(CompletionItem(prefix + item.name))
             elif item.is_dir():
                 completions.append(CompletionItem(prefix + item.name + "/"))
-    except PermissionError:
+    except (FileNotFoundError, NotADirectoryError, PermissionError):
         pass
 
     return completions
@@ -88,7 +88,7 @@ class DirectoryType(click.ParamType):
             for item in sorted(parent.iterdir(), key=lambda p: p.name):
                 if item.is_dir() and item.name.startswith(stem_filter):
                     completions.append(CompletionItem(prefix + item.name + "/"))
-        except PermissionError:
+        except (FileNotFoundError, NotADirectoryError, PermissionError):
             pass
 
         return completions

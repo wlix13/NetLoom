@@ -50,6 +50,12 @@ def show_topology(
     app: Application = obj["app"]
     internal: InternalTopology = obj["internal"]
 
+    if show_map and show_graph:
+        raise click.BadParameter("Choose only one of --map or --graph.", param_hint="--map/--graph")
+
+    if (show_map or show_graph) and any([show_all, routing, services, bridges, vlans, tunnels, sysctl]):
+        raise click.BadParameter("Topology summary cannot be shown with --map or --graph.", param_hint="--map/--graph")
+
     if show_map:
         render_map(internal, app.console)
         return

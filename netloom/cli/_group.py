@@ -1,7 +1,5 @@
 """CLI group definition and global options."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import rich_click as click
@@ -84,7 +82,7 @@ click.rich_click.COMMAND_GROUPS = {
 def cli(
     ctx: click.Context,
     topo_path: str | None,
-    workdir: str,
+    workdir: Path,
     basefolder: str | None,
     ova_path: str | None,
     base_vm_name: str,
@@ -112,10 +110,10 @@ def cli(
     app.vbox_settings = vbox_settings
 
     internal = convert_topology(load_topology(topo_path), workdir=workdir)
-    Path(workdir).mkdir(parents=True, exist_ok=True)
+    app.workdir.mkdir(parents=True, exist_ok=True)
 
     ctx.obj = {
         "app": app,
         "internal": internal,
-        "workdir": workdir,
+        "workdir": app.workdir,
     }
