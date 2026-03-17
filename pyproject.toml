@@ -26,7 +26,7 @@ dependencies = [
 scripts.netloom = "netloom.cli:cli"
 
 [dependency-groups]
-dev = [ "prek", "ruff", "ty" ]
+dev = [ "poethepoet", "prek", "ruff", "ty" ]
 docs = [ "mkdocs", "mkdocs-material", "mkdocs-static-i18n" ]
 
 [tool.hatch]
@@ -42,3 +42,9 @@ lint.isort.lines-after-imports = 2
 
 [tool.ty]
 environment.root = [ "." ]
+
+[tool.poe]
+tasks.format = "ruff format --check ."
+tasks.lint = "ruff check ."
+tasks.typecheck = "ty check"
+tasks.docs = "mkdocs serve -f mkdocs.yaml"
