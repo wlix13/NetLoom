@@ -1,10 +1,22 @@
 """VirtualBox adapter: VBoxManage CLI wrapper and VBoxSettings dataclass."""
 
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .enums import VMStartType
+
+
+@dataclass
+class UartConfig:
+    """Parsed UART configuration from VBoxManage showvminfo output."""
+
+    enabled: bool
+    io_base: str = "0x03f8"
+    irq: int = 4
+    mode: str = "disconnected"
+    endpoint: str = ""
 
 
 @dataclass
@@ -71,6 +83,41 @@ class VBoxManage:
         """Return VM info, or empty string if the VM does not exist."""
 
         return self._probe(["VBoxManage", "showvminfo", vm_name, "--machinereadable"])
+
+    def get_uart_config(self, vm_name: str) -> UartConfig:
+        """Parse UART1 configuration from a VM's showvminfo output."""
+
+        info = self.show_vm_info(vm_name)
+        uart_match = re.search(r'^uart1="(.+?)"', info, re.MULTILINE)
+        mode_match = re.search(r'^uartmode1="(.+?)"', info, re.MULTILINE)
+
+        if not uart_match or uart_match.group(1) == "off":
+            return UartConfig(enabled=False)
+
+        uart_params = uart_match.group(1).split(",")
+        if len(uart_params) != 2:
+            return UartConfig(enabled=False)
+        io_base, irq_str = uart_params
+
+        try:
+            irq = int(irq_str)
+        except ValueError:
+            return UartConfig(enabled=False)
+
+        if not mode_match:
+            return UartConfig(enabled=True, io_base=io_base, irq=irq)
+
+        mode_parts = mode_match.group(1).split(",", 1)
+        mode = mode_parts[0]
+        endpoint = mode_parts[1] if len(mode_parts) > 1 else ""
+
+        return UartConfig(
+            enabled=True,
+            io_base=io_base,
+            irq=irq,
+            mode=mode,
+            endpoint=endpoint,
+        )
 
     def list_snapshots(self, vm_name: str) -> str:
         """Return raw stdout of ``VBoxManage snapshot <vm> list``."""
