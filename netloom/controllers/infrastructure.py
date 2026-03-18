@@ -180,6 +180,8 @@ class InfrastructureController(BaseController["Application"]):
             "on" if vbox.hpet else "off",
             "--paravirtprovider",
             vbox.paravirt_provider,
+            "--uart1",
+            "off",
             "--boot1",
             "disk",
             "--boot2",
