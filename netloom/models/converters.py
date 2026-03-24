@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core.enums import FirewallImpl, InterfaceKind, NodeRole
+from ..core.enums import FirewallImpl, InterfaceKind
 from ..core.errors import TopologyError
 from ..core.mac import generate_mac
 from .config import (
@@ -104,10 +104,6 @@ class TopologyConverter:
         # Node-specific sysctl (overrides globals)
         if node.sysctl:
             custom.update(node.sysctl)
-
-        # Don't make users broke router by default :)
-        if node.role == NodeRole.ROUTER:
-            ip_forwarding = True
 
         return InternalSysctl(ip_forwarding=ip_forwarding, custom=custom)
 
