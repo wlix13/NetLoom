@@ -664,17 +664,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#topologycontroller" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TopologyController
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#infrastructurecontroller" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -690,17 +679,6 @@
     <span class="md-ellipsis">
       
         ConfigController
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#networkcontroller" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NetworkController
       
     </span>
   </a>
@@ -830,10 +808,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#output-mapping" class="md-nav__link">
+  <a href="#output-path-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Output Mapping
+        Output Path Mapping
       
     </span>
   </a>
@@ -873,6 +851,45 @@
     <span class="md-ellipsis">
       
         Config-Drives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-layer-netloomdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Layer (netloom/data/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Layer (netloom/data/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configdrivepy-configdrive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        configdrive.py — ConfigDrive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_fatpy-fat16-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _fat.py — FAT16 helpers
       
     </span>
   </a>
@@ -1069,17 +1086,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#topologycontroller" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TopologyController
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#infrastructurecontroller" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1095,17 +1101,6 @@
     <span class="md-ellipsis">
       
         ConfigController
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#networkcontroller" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NetworkController
       
     </span>
   </a>
@@ -1235,10 +1230,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#output-mapping" class="md-nav__link">
+  <a href="#output-path-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Output Mapping
+        Output Path Mapping
       
     </span>
   </a>
@@ -1278,6 +1273,45 @@
     <span class="md-ellipsis">
       
         Config-Drives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-layer-netloomdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Layer (netloom/data/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Layer (netloom/data/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configdrivepy-configdrive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        configdrive.py — ConfigDrive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_fatpy-fat16-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _fat.py — FAT16 helpers
       
     </span>
   </a>
@@ -1364,22 +1398,21 @@
 <h2 id="overview">Overview</h2>
 <p>NetLoom follows a <strong>controller-based architecture</strong> with a singleton Application class coordinating multiple specialized controllers. Each controller handles a specific domain of functionality.</p>
 <pre class="mermaid"><code>flowchart TB
-    subgraph CLI["CLI Layer (cli.py)"]
-        commands[Commands: init, create, gen, attach, start, stop, destroy]
+    subgraph CLI["CLI Package (netloom/cli/)"]
+        group["_group.py\n(load + convert topology)"]
+        cmds["infra.py · lifecycle.py\nmanage.py · show.py"]
     end
 
     subgraph App["Application (core/application.py)"]
         direction LR
-        TC[Topology&lt;br/&gt;Controller]
-        IC[Infrastructure&lt;br/&gt;Controller]
-        CC[Config&lt;br/&gt;Controller]
-        NC[Network&lt;br/&gt;Controller]
+        IC[Infrastructure\nController]
+        CC[Config\nController]
     end
 
     subgraph External["External Systems"]
         direction LR
-        VBox[VirtualBox&lt;br/&gt;VBoxManage]
-        Jinja[Jinja2&lt;br/&gt;Templates]
+        VBox[VirtualBox\nVBoxManage]
+        Jinja[Jinja2\nTemplates]
     end
 
     CLI --&gt; App
@@ -1390,39 +1423,17 @@
 <ul>
 <li>Manages controller instances (lazy initialization)</li>
 <li>Provides a shared <code>Console</code> for Rich terminal output</li>
-<li>Tracks workdir and debug state</li>
+<li>Tracks <code>workdir</code>, <code>debug</code> state, and <code>vbox_settings</code></li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">app</span> <span class="o">=</span> <span class="n">Application</span><span class="o">.</span><span class="n">current</span><span class="p">()</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">app</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;lab.yaml&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">app</span><span class="o">.</span><span class="n">infrastructure</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">internal</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">app</span><span class="o">.</span><span class="n">infrastructure</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">internal</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">app</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">internal</span><span class="p">)</span>
 </code></pre></div>
-<p>Controllers are accessed as properties and created on first access.</p>
+<p>Controllers are accessed as properties and created on first access. They must never import each other at module level - siblings are accessed via <code>self.app.other_controller</code> inside methods.</p>
 <h3 id="controllers">Controllers</h3>
-<h4 id="topologycontroller">TopologyController</h4>
-<p><strong>Location:</strong> <code>netloom/controllers/topology.py</code></p>
-<p>Handles topology loading and conversion:</p>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>load(path)</code></td>
-<td>Load and validate a YAML topology file</td>
-</tr>
-<tr>
-<td><code>convert(topology, workdir)</code></td>
-<td>Convert external topology to internal representation</td>
-</tr>
-</tbody>
-</table>
-<p>The internal representation adds computed fields like interface names, peer relationships, and merged sysctl settings.</p>
 <h4 id="infrastructurecontroller">InfrastructureController</h4>
 <p><strong>Location:</strong> <code>netloom/controllers/infrastructure.py</code></p>
-<p>Manages VirtualBox VM lifecycle:</p>
+<p>Manages VirtualBox VM lifecycle via <code>VBoxManage</code>:</p>
 <table>
 <thead>
 <tr>
@@ -1431,10 +1442,6 @@
 </tr>
 </thead>
 <tbody>
-<tr>
-<td><code>configure(...)</code></td>
-<td>Set VirtualBox settings (basefolder, OVA path, etc.)</td>
-</tr>
 <tr>
 <td><code>init(internal, workdir)</code></td>
 <td>Import OVA and create golden snapshot</td>
@@ -1453,15 +1460,10 @@
 </tr>
 <tr>
 <td><code>destroy(internal, destroy_base)</code></td>
-<td>Remove VMs (hard shutdown)</td>
-</tr>
-<tr>
-<td><code>get_configdrive(node_name)</code></td>
-<td>Get config-drive path for a node</td>
+<td>Remove VMs (hard shutdown + unregister)</td>
 </tr>
 </tbody>
 </table>
-<p>Internally uses <code>VBoxManage</code> commands for VM operations.</p>
 <h4 id="configcontroller">ConfigController</h4>
 <p><strong>Location:</strong> <code>netloom/controllers/config.py</code></p>
 <p>Handles configuration generation and deployment:</p>
@@ -1478,8 +1480,8 @@
 <td>List available template sets</td>
 </tr>
 <tr>
-<td><code>generate(internal, template_set)</code></td>
-<td>Generate configs using templates</td>
+<td><code>generate(internal)</code></td>
+<td>Render Jinja2 templates; auto-detects sets per node</td>
 </tr>
 <tr>
 <td><code>attach(internal)</code></td>
@@ -1487,27 +1489,32 @@
 </tr>
 <tr>
 <td><code>save(internal)</code></td>
-<td>Pull configs from VMs to host</td>
+<td>Pull configs from config-drives to host</td>
 </tr>
 <tr>
 <td><code>restore(internal)</code></td>
-<td>Restore saved configs to staging</td>
+<td>Restore saved configs to staging area</td>
 </tr>
 </tbody>
 </table>
-<h4 id="networkcontroller">NetworkController</h4>
-<p><strong>Location:</strong> <code>netloom/controllers/network.py</code></p>
-<p>Network-related utilities and calculations.</p>
+<p><code>generate()</code> always renders the <code>networkd</code> set and auto-detects additional sets per node:</p>
+<ul>
+<li><code>bird</code> — when <code>routing.engine</code> is <code>bird</code></li>
+<li><code>nftables</code> — when <code>services.firewall</code> is configured</li>
+<li><code>wireguard</code> — when <code>services.wireguard</code> is configured</li>
+</ul>
 <h2 id="data-flow">Data Flow</h2>
 <h3 id="1-topology-loading">1. Topology Loading</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>YAML File → TopologyController.load() → ExternalTopology (Pydantic Model)
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                             │
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                                             ▼
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                    TopologyController.convert() → InternalTopology
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>YAML File → load_topology() → Topology (Pydantic, mirrors YAML schema)
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                    │
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                                    ▼
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>              convert_topology() → InternalTopology (runtime representation)
 </code></pre></div>
-<p>The external <code>Topology</code> model mirrors the YAML schema. The internal representation adds:</p>
+<p>Both functions are called in the CLI group (<code>netloom/cli/_group.py</code>) before dispatching to any subcommand. The result is stored in <code>ctx.obj["internal"]</code>.</p>
+<p>The conversion adds:</p>
 <ul>
-<li>Computed interface names (eth1, eth2, ...)</li>
+<li>Deterministic MAC addresses per interface (seeded from <code>&lt;topo-id&gt;-&lt;node&gt;-&lt;iface&gt;</code>)</li>
+<li>VirtualBox NIC index allocation per node</li>
 <li>Peer node relationships</li>
 <li>Merged sysctl settings (defaults + node-specific)</li>
 <li>Resolved service configurations</li>
@@ -1515,67 +1522,93 @@
 <h3 id="2-configuration-generation">2. Configuration Generation</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>InternalTopology → ConfigController.generate()
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>                          │
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                          ├─→ Jinja2 Environment
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                          │       │
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                          │       ▼
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                          │   Template Sets (networkd/, services/)
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                          │       │
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                          │       ▼
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                          └─→ Generated Files (workdir/configs/&lt;node&gt;/)
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                          ├─→ networkd/     (always)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                          ├─→ bird/         (if routing.engine == bird)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                          ├─→ nftables/     (if services.firewall set)
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                          └─→ wireguard/    (if services.wireguard set)
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                                  │
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                                  ▼
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                     workdir/configs/&lt;node&gt;/etc/...
 </code></pre></div>
 <h3 id="3-vm-deployment">3. VM Deployment</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>InternalTopology → InfrastructureController.create()
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>                          │
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                          ├─→ VBoxManage clonevm (linked clone)
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>                          ├─→ VBoxManage createmedium (config-drive)
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                          └─→ VBoxManage modifyvm (NICs, hardware)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                          ├─→ VBoxManage clonevm   (linked clone per node)
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>                          ├─→ VBoxManage createmedium  (config-drive VMDK)
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                          └─→ VBoxManage modifyvm   (NICs → internal networks)
 </code></pre></div>
 <h2 id="models">Models</h2>
 <h3 id="external-models-netloommodelsconfigpy">External Models (<code>netloom/models/config.py</code>)</h3>
-<p>Pydantic models that match the YAML schema:</p>
+<p>Pydantic models that match the YAML schema exactly:</p>
 <ul>
-<li><code>Topology</code> - Root model</li>
-<li><code>Meta</code> - Topology metadata</li>
-<li><code>Defaults</code> - Global defaults</li>
-<li><code>Link</code> - Node connections</li>
-<li><code>Node</code> - Node configuration</li>
-<li><code>InterfaceConfig</code>, <code>BridgeConfig</code>, <code>RoutingConfig</code>, etc.</li>
+<li><code>Topology</code> — root model (<code>meta</code>, <code>networks</code>, <code>nodes</code>, <code>defaults</code>)</li>
+<li><code>Meta</code> — topology metadata</li>
+<li><code>Defaults</code> — global defaults (<code>ip_forwarding</code>, <code>sysctl</code>, <code>vbox</code>)</li>
+<li><code>Network</code> — named L2 network segment</li>
+<li><code>Node</code> — node configuration</li>
+<li><code>InterfaceConfig</code> — named interface (dict value in <code>node.interfaces</code>)</li>
+<li><code>VLANConfig</code>, <code>TunnelConfig</code>, <code>BridgeConfig</code></li>
+<li><code>StaticRoute</code> — <code>{destination, gateway}</code> object</li>
+<li><code>RoutingConfig</code>, <code>OSPFConfig</code>, <code>RIPConfig</code></li>
+<li><code>ServicesConfig</code>, <code>WireguardConfig</code>, <code>FirewallConfig</code></li>
 </ul>
 <h3 id="internal-models-netloommodelsinternalpy">Internal Models (<code>netloom/models/internal.py</code>)</h3>
-<p>Runtime representations with computed fields:</p>
+<p>Runtime representations with computed and enriched fields:</p>
 <ul>
-<li><code>InternalTopology</code> - Enriched topology</li>
-<li><code>InternalNode</code> - Node with resolved interfaces</li>
-<li><code>InternalInterface</code> - Interface with peer info</li>
-<li><code>InternalLink</code> - Link with interface references</li>
+<li><code>InternalTopology</code> — full topology with node/link indexes</li>
+<li><code>InternalNode</code> — node with resolved interfaces, computed config dirs</li>
+<li><code>InternalInterface</code> — interface with <code>mac_address</code>, <code>vbox_nic_index</code>, <code>peer_node</code>, <code>network</code></li>
+<li><code>InternalNetwork</code> — L2 segment with VirtualBox network name and participant list</li>
+<li><code>InternalLink</code> — point-to-point connection (subset of networks with exactly 2 participants)</li>
+<li><code>InternalBridge</code>, <code>InternalVLAN</code>, <code>InternalTunnel</code></li>
+<li><code>InternalRouting</code>, <code>InternalServices</code>, <code>InternalSysctl</code></li>
+<li><code>InternalVBoxSettings</code> — per-node or topology-level VirtualBox settings</li>
 </ul>
 <h2 id="template-system">Template System</h2>
-<p>Templates are organized in <code>netloom/templates/</code>:</p>
+<p>Templates live in <code>netloom/templates/</code> organized by technology:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>templates/
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├── _base/
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│   └── _macros.j2       # Shared Jinja2 macros
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>├── networkd/            # systemd-networkd templates
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│   ├── hostname.j2
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│   ├── interface.network.j2
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│   ├── routes.network.j2
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>│   └── sysctl.conf.j2
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>└── services/
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    └── services.list.j2
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├──<span class="w"> </span>_base/
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│<span class="w">   </span>└──<span class="w"> </span>_macros.j2<span class="w">            </span><span class="c1"># Shared Jinja2 macros</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>├──<span class="w"> </span>networkd/<span class="w">                 </span><span class="c1"># systemd-networkd (always rendered)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│<span class="w">   </span>├──<span class="w"> </span>hostname.j2
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│<span class="w">   </span>├──<span class="w"> </span>interface.link.j2<span class="w">     </span><span class="c1"># MAC-based interface rename rule</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│<span class="w">   </span>├──<span class="w"> </span>interface.network.j2
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>│<span class="w">   </span>├──<span class="w"> </span>bridge.netdev.j2
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>│<span class="w">   </span>├──<span class="w"> </span>bridge.network.j2
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>│<span class="w">   </span>├──<span class="w"> </span>bridge-port.network.j2
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>│<span class="w">   </span>├──<span class="w"> </span>vlan.netdev.j2
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>│<span class="w">   </span>├──<span class="w"> </span>vlan.network.j2
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>│<span class="w">   </span>├──<span class="w"> </span>vlan-parent.network.j2
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>│<span class="w">   </span>├──<span class="w"> </span>tunnel.netdev.j2
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>│<span class="w">   </span>├──<span class="w"> </span>tunnel.network.j2
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>│<span class="w">   </span>├──<span class="w"> </span>routes.network.j2
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>│<span class="w">   </span>└──<span class="w"> </span>sysctl.conf.j2
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>├──<span class="w"> </span>bird/<span class="w">                     </span><span class="c1"># BIRD routing daemon</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>│<span class="w">   </span>├──<span class="w"> </span>bird.conf.j2
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>│<span class="w">   </span>├──<span class="w"> </span>ospf.conf.j2
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>│<span class="w">   </span>├──<span class="w"> </span>rip.conf.j2
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>│<span class="w">   </span>└──<span class="w"> </span>static.conf.j2
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>├──<span class="w"> </span>nftables/<span class="w">                 </span><span class="c1"># nftables firewall</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>│<span class="w">   </span>└──<span class="w"> </span>nftables.conf.j2
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>├──<span class="w"> </span>wireguard/<span class="w">                </span><span class="c1"># WireGuard VPN</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>│<span class="w">   </span>└──<span class="w"> </span>wg0.conf.j2
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>└──<span class="w"> </span>services/
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="w">    </span>└──<span class="w"> </span>services.list.j2
 </code></pre></div>
 <h3 id="template-context">Template Context</h3>
 <p>Each template receives:</p>
 <ul>
-<li><code>node</code> - The internal node model</li>
-<li><code>topology</code> - The full internal topology</li>
-<li>Global macros from <code>_base/_macros.j2</code></li>
+<li><code>node</code> — <code>InternalNode</code> for the node being configured</li>
+<li><code>topology</code> — the full <code>InternalTopology</code></li>
+<li><code>iface</code> — <code>InternalInterface</code> (for per-interface templates)</li>
 </ul>
-<h3 id="output-mapping">Output Mapping</h3>
-<p>Template filenames determine output paths:</p>
+<h3 id="output-path-mapping">Output Path Mapping</h3>
+<p>Template filenames determine output paths (resolved by <code>ConfigController._OUTPUT_PATHS</code>):</p>
 <table>
 <thead>
 <tr>
-<th>Template</th>
-<th>Output</th>
+<th>Template pattern</th>
+<th>Output path</th>
 </tr>
 </thead>
 <tbody>
@@ -1584,17 +1617,29 @@
 <td><code>etc/hostname</code></td>
 </tr>
 <tr>
-<td><code>interface.network.j2</code></td>
-<td><code>etc/systemd/network/&lt;iface&gt;.network</code></td>
+<td><code>*.network.j2</code></td>
+<td><code>etc/systemd/network/&lt;name&gt;.network</code></td>
+</tr>
+<tr>
+<td><code>*.netdev.j2</code></td>
+<td><code>etc/systemd/network/&lt;name&gt;.netdev</code></td>
+</tr>
+<tr>
+<td><code>*.link.j2</code></td>
+<td><code>etc/systemd/network/&lt;name&gt;.link</code></td>
 </tr>
 <tr>
 <td><code>sysctl.conf.j2</code></td>
 <td><code>etc/sysctl.d/99-netloom.conf</code></td>
 </tr>
+<tr>
+<td><code>*.conf.j2</code></td>
+<td><code>etc/&lt;name&gt;.conf</code></td>
+</tr>
 </tbody>
 </table>
 <h2 id="virtualbox-integration">VirtualBox Integration</h2>
-<p>NetLoom uses <code>VBoxManage</code> CLI for all VM operations:</p>
+<p>NetLoom uses <code>VBoxManage</code> CLI for all VM operations.</p>
 <h3 id="linked-clones">Linked Clones</h3>
 <p>VMs are created as linked clones from a golden snapshot:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>VBoxManage<span class="w"> </span>clonevm<span class="w"> </span><span class="s2">&quot;Labs-Base&quot;</span><span class="w"> </span>--name<span class="w"> </span><span class="s2">&quot;R1&quot;</span><span class="w"> </span>--snapshot<span class="w"> </span><span class="s2">&quot;golden&quot;</span><span class="w"> </span><span class="se">\</span>
@@ -1612,25 +1657,102 @@
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>--size<span class="w"> </span><span class="m">16</span><span class="w"> </span>--format<span class="w"> </span>VMDK
 </code></pre></div>
 <p>The config-drive contains network configurations that the VM applies on boot.</p>
-<h3 id="internal-networks">Internal Networks</h3>
-<p>Links are implemented as VirtualBox internal networks:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>VBoxManage<span class="w"> </span>modifyvm<span class="w"> </span><span class="s2">&quot;R1&quot;</span><span class="w"> </span>--nic2<span class="w"> </span>intnet<span class="w"> </span>--intnet2<span class="w"> </span><span class="s2">&quot;lab-R1-R2&quot;</span>
+<h2 id="data-layer-netloomdata">Data Layer (<code>netloom/data/</code>)</h2>
+<p>Config-drive I/O is handled by two modules:</p>
+<h3 id="configdrivepy-configdrive"><code>configdrive.py</code> — <code>ConfigDrive</code></h3>
+<p><code>ConfigDrive</code> is a dataclass wrapping a VirtualBox split VMDK pair:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;node&gt;-cfg.vmdk</code></td>
+<td>VirtualBox descriptor (metadata only)</td>
+</tr>
+<tr>
+<td><code>&lt;node&gt;-cfg-flat.vmdk</code></td>
+<td>Raw data file — the actual FAT16 filesystem</td>
+</tr>
+</tbody>
+</table>
+<p><code>_fat.py</code> operates directly on the flat file; the descriptor is only used by VirtualBox itself.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">drive</span> <span class="o">=</span> <span class="n">ConfigDrive</span><span class="p">(</span><span class="n">vmdk</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;R1-cfg.vmdk&quot;</span><span class="p">))</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">drive</span><span class="o">.</span><span class="n">copy_in</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;workdir/configs/R1&quot;</span><span class="p">))</span>   <span class="c1"># staging → config-drive</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">drive</span><span class="o">.</span><span class="n">copy_out</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;workdir/saved/R1&quot;</span><span class="p">))</span>    <span class="c1"># config-drive → host</span>
 </code></pre></div>
-<p>Each link gets a unique internal network name ensuring isolation.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>copy_in(src_dir)</code></td>
+<td>Write a directory tree into the FAT filesystem</td>
+</tr>
+<tr>
+<td><code>copy_out(dst_dir)</code></td>
+<td>Read all files from the FAT filesystem to host</td>
+</tr>
+<tr>
+<td><code>.flat</code></td>
+<td>Property returning the <code>-flat.vmdk</code> path</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_fatpy-fat16-helpers"><code>_fat.py</code> — FAT16 helpers</h3>
+<p>Internal helpers that operate on the raw flat VMDK using <code>fattools</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open_fat_fs(path, mode)</code></td>
+<td>Context manager — opens the flat file as a FAT fs</td>
+</tr>
+<tr>
+<td><code>format_fat16(path, size_mb)</code></td>
+<td>Format a raw file as FAT16</td>
+</tr>
+<tr>
+<td><code>makedirs(fs, path)</code></td>
+<td>Create directory hierarchy inside the FAT fs</td>
+</tr>
+<tr>
+<td><code>copy_dir_recursive(fs, dst, copied)</code></td>
+<td>Recursively copy FAT fs tree to a local directory</td>
+</tr>
+</tbody>
+</table>
+<h3 id="internal-networks">Internal Networks</h3>
+<p>Networks are implemented as VirtualBox internal networks named <code>&lt;topology-id&gt;_&lt;network-name&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>VBoxManage<span class="w"> </span>modifyvm<span class="w"> </span><span class="s2">&quot;R1&quot;</span><span class="w"> </span>--nic2<span class="w"> </span>intnet<span class="w"> </span>--intnet2<span class="w"> </span><span class="s2">&quot;my-lab_r1-r2&quot;</span>
+</code></pre></div>
+<p>All interfaces on different nodes that share the same <code>network</code> name in the YAML are connected to the same VirtualBox internal network, acting as a virtual L2 switch.</p>
 <h2 id="extension-points">Extension Points</h2>
 <h3 id="custom-template-sets">Custom Template Sets</h3>
-<p>Create a new directory in <code>templates/</code> with your templates:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>templates/
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>└── my-templates/
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    ├── custom.conf.j2
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    └── ...
+<p>Create a new directory in <code>netloom/templates/</code> with your templates:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>netloom/templates/
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>└──<span class="w"> </span>my-templates/
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>├──<span class="w"> </span>custom.conf.j2
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span>└──<span class="w"> </span>...
 </code></pre></div>
-<p>Use with: <code>netloom --topology lab.yaml gen --templates my-templates</code></p>
+<p>Then register it in <code>ConfigController._get_output_path</code> and add a <code>_render_template_set</code> call in <code>ConfigController.generate</code>.</p>
 <h3 id="adding-controllers">Adding Controllers</h3>
 <ol>
-<li>Create a new controller class inheriting from <code>BaseController</code></li>
-<li>Add a property in <code>Application</code> class</li>
-<li>Wire up CLI commands in <code>cli.py</code></li>
+<li>Create a new class inheriting from <code>BaseController</code> (<code>netloom/core/controller.py</code>)</li>
+<li>Add a <code>@cached_property</code> in <code>Application</code> returning the new controller</li>
+<li>Add CLI commands in the appropriate module under <code>netloom/cli/</code></li>
 </ol>
 
 
