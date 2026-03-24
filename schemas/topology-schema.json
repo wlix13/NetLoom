@@ -95,6 +95,12 @@
                     "default": "physical",
                     "description": "'physical' gets a VirtualBox NIC when 'network' is set. 'loopback' is OS-only: no NIC, no MAC, skips .link template."
                   },
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 36,
+                    "description": "VirtualBox adapter slot (1-36). Auto-assigned if omitted."
+                  },
                   "network": {
                     "type": "string",
                     "description": "The name of the L2 network this interface is connected to. Required for 'physical'; forbidden for 'loopback'."
@@ -123,6 +129,19 @@
                     "description": "Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated deterministically if omitted."
                   }
                 },
+                "allOf": [
+                  {
+                    "if": { "properties": { "kind": { "const": "loopback" } } },
+                    "then": {
+                      "not": {
+                        "anyOf": [
+                          { "required": ["network"] },
+                          { "required": ["index"] }
+                        ]
+                      }
+                    }
+                  }
+                ],
                 "additionalProperties": false
               }
             },

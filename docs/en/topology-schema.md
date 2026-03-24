@@ -141,6 +141,7 @@ Interface configurations as a **named map** (key = interface name). This replace
 |--------------|---------|------------|----------------------------------------------------------------------------------|
 | `network`    | string  | -          | Name of the L2 network this interface connects to. Omit for loopback interfaces. |
 | `kind`       | string  | `physical` | Interface kind: `physical` or `loopback`                                         |
+| `index`      | integer | -          | VirtualBox adapter slot (1-36). Overrides automatic allocation.                  |
 | `ip`         | string  | -          | IP address in CIDR notation (e.g., `10.0.1.1/24`)                                |
 | `gateway`    | string  | -          | Default gateway IP                                                               |
 | `dhcp`       | boolean | `false`    | Enable DHCP on this interface                                                    |
@@ -170,7 +171,10 @@ interfaces:
 
 !!! info "Interface kinds"
     - `physical` interfaces get a VirtualBox NIC when `network` is set.
-    - `loopback` interfaces are OS-only: no VirtualBox NIC, no MAC address, and the `.link` template is skipped. Loopback interfaces must not have `network` set.
+    - `loopback` interfaces are OS-only: no VirtualBox NIC, no MAC address, and the `.link` template is skipped. Loopback interfaces must not have `network` or `index` set.
+
+!!! tip "Adapter slot assignment"
+    By default, `ethN` interfaces map to VirtualBox adapter slot `N+1` (e.g. `eth0` → slot 1, `eth2` → slot 3), and custom-named interfaces get the next available slot. The `index` field lets you override this — `index: 5` forces the interface onto adapter slot 5 regardless of its name. Explicit indices take priority over the `ethN` naming convention. Duplicate indices on the same node are rejected.
 
 #### How interface renaming works
 
