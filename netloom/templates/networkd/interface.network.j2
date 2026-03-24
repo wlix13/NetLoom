@@ -19,4 +19,11 @@ Address={{ iface.ip }}
 {% if iface.gateway -%}
 Gateway={{ iface.gateway }}
 {% endif -%}
+{% endif -%}
+{% if iface.proxy_arp -%}
+IPv4ProxyARP=yes
 {% endif %}
+{% for addr in iface.proxy_arp %}
+[IPv4ProxyARPAddress]
+Address={{ addr }}
+{% endfor %}
