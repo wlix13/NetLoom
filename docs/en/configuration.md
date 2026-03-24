@@ -6,7 +6,7 @@ This document covers NetLoom's configuration options, workdir structure, and cus
 
 The working directory (default: `.labs_configs`) contains all generated artifacts:
 
-```
+```bash
 .labs_configs/
 ├── configs/           # Generated configurations (ready for deployment)
 │   ├── R1/
@@ -77,7 +77,7 @@ defaults:
 - **NIC 1** - NAT (management, unchanged from base)
 - **NIC 2+** - Internal networks (topology links)
 
-Internal network names follow the pattern: `<topology-id>-<nodeA>-<nodeB>`
+Internal network names follow the pattern: `<topology-id>-<network-name>`
 
 ## Template Customization
 
@@ -92,23 +92,32 @@ netloom --topology lab.yaml list-templates
 Built-in sets:
 
 - `networkd` - systemd-networkd configuration (default)
+- `bird` - BIRD Internet Routing Daemon configuration (auto-rendered when engine=bird)
+- `nftables` - nftables firewall configuration (auto-rendered when firewall is configured)
+- `wireguard` - WireGuard VPN configuration (auto-rendered when WireGuard is configured)
+
+### Automatic Template Rendering
+
+When generating configurations, NetLoom automatically renders additional template sets based on node configuration:
+
+- **BIRD templates** are rendered when `routing.engine: bird` is set
+- **nftables templates** are rendered when `services.firewall` is configured
+- **WireGuard templates** are rendered when `services.wireguard` is configured
 
 ### Creating Custom Templates
 
 1. Create a new directory in `netloom/templates/`:
 
-```
-netloom/templates/
-└── my-templates/
-    ├── custom-hostname.j2
-    └── my-config.j2
-```
+    ```bash
+    netloom/templates/
+    └── my-templates/
+        ├── custom-hostname.j2
+        └── my-config.j2
+    ```
 
-2. Use in generation:
+2. Register the output paths in `ConfigController._get_output_path` (`netloom/controllers/config.py`).
 
-```bash
-netloom --topology lab.yaml gen --templates my-templates
-```
+3. Add a `_render_template_set` call for your new set inside `ConfigController.generate`.
 
 ### Template Variables
 
@@ -125,6 +134,9 @@ Templates receive these variables:
 {{ node.name }}              {# Node name #}
 {{ node.role }}              {# router, switch, host #}
 {{ node.interfaces }}        {# List of interfaces #}
+{{ node.vlans }}             {# List of VLAN interfaces #}
+{{ node.tunnels }}           {# List of IP tunnels #}
+{{ node.bridges }}           {# List of bridge configurations #}
 {{ node.sysctl }}            {# Merged sysctl settings #}
 {{ node.routing }}           {# Routing configuration #}
 {{ node.services }}          {# Services configuration #}
@@ -134,12 +146,54 @@ Templates receive these variables:
 
 ```jinja2
 {% for iface in node.interfaces %}
-{{ iface.name }}             {# eth1, eth2, etc. #}
+{{ iface.name }}             {# interface name (eth1, lo0, etc.) #}
+{{ iface.mac_address }}      {# MAC address — used by .link file to rename the interface on boot #}
 {{ iface.ip }}               {# IP in CIDR notation #}
 {{ iface.gateway }}          {# Gateway IP #}
-{{ iface.peer_node }}        {# Connected node name #}
+{{ iface.mtu }}              {# MTU override (None = OS default) #}
+{{ iface.dhcp }}             {# DHCP enabled #}
+{{ iface.kind }}             {# "physical" or "loopback" #}
 {{ iface.configured }}       {# Whether to generate config #}
+{{ iface.peer_node }}        {# Connected node name (None for unlinked interfaces) #}
 {% endfor %}
+```
+
+**VLAN properties:**
+
+```jinja2
+{% for vlan in node.vlans %}
+{{ vlan.id }}                {# VLAN ID (1-4094) #}
+{{ vlan.parent }}            {# Parent interface (eth1) #}
+{{ vlan.name }}              {# Interface name (eth1.100) #}
+{{ vlan.ip }}                {# IP in CIDR notation #}
+{{ vlan.gateway }}           {# Gateway IP #}
+{% endfor %}
+```
+
+**Tunnel properties:**
+
+```jinja2
+{% for tunnel in node.tunnels %}
+{{ tunnel.name }}            {# Tunnel interface name #}
+{{ tunnel.type }}            {# ipip, gre, or sit #}
+{{ tunnel.local }}           {# Local endpoint IP #}
+{{ tunnel.remote }}          {# Remote endpoint IP #}
+{{ tunnel.ip }}              {# IP in CIDR notation #}
+{% endfor %}
+```
+
+**Routing properties:**
+
+```jinja2
+{{ node.routing.engine }}        {# bird, frr, or none #}
+{{ node.routing.router_id }}     {# Router ID #}
+{{ node.routing.static_routes }} {# List of static routes #}
+{{ node.routing.ospf_enabled }}  {# OSPF enabled #}
+{{ node.routing.ospf_areas }}    {# List of OSPF areas #}
+{{ node.routing.rip }}           {# RIP configuration #}
+{{ node.routing.rip.enabled }}   {# RIP enabled #}
+{{ node.routing.rip.version }}   {# RIP version (1 or 2) #}
+{{ node.routing.rip.interfaces }} {# Interfaces in RIP #}
 ```
 
 ### Output Path Mapping
@@ -162,6 +216,200 @@ Common macros are in `templates/_base/_macros.j2`:
 
 {{ macros.some_helper() }}
 ```
+
+## Configuration Examples
+
+### VLAN Configuration
+
+Create VLAN interfaces on physical interfaces:
+
+```yaml
+nodes:
+  - name: SW1
+    role: switch
+    interfaces:
+      eth1:
+        network: trunk
+    vlans:
+      - id: 100
+        parent: eth1
+        ip: "10.100.0.1/24"
+      - id: 200
+        parent: eth1
+        name: vlan-mgmt        # custom interface name instead of "eth1.200"
+        ip: "10.200.0.1/24"
+```
+
+Generated files:
+
+- `etc/systemd/network/11-eth1.100.netdev` - VLAN interface definition
+- `etc/systemd/network/11-eth1.100.network` - VLAN IP configuration
+- `etc/systemd/network/09-eth1-vlan.network` - Parent interface with VLAN association
+
+### RIP Routing Configuration
+
+Configure RIP routing with BIRD:
+
+```yaml
+nodes:
+  - name: R1
+    role: router
+    interfaces:
+      eth1:
+        network: net1
+        ip: "10.0.1.1/24"
+      eth2:
+        network: net2
+        ip: "10.0.2.1/24"
+    routing:
+      engine: bird
+      router_id: "1.1.1.1"
+      rip:
+        enabled: true
+        version: 2
+        interfaces: ["eth1", "eth2"]
+```
+
+Generated files:
+
+- `etc/bird/bird.conf` - Main BIRD configuration
+- `etc/bird/conf.d/rip.conf` - RIP protocol configuration
+
+### OSPF Routing Configuration
+
+Configure OSPF with multiple areas:
+
+```yaml
+nodes:
+  - name: R1
+    role: router
+    interfaces:
+      eth1:
+        network: net1
+        ip: "10.0.1.1/24"
+      eth2:
+        network: net2
+        ip: "10.0.2.1/24"
+    routing:
+      engine: bird
+      router_id: "1.1.1.1"
+      ospf:
+        enabled: true
+        areas:
+          - id: "0.0.0.0"
+            interfaces: ["eth1"]
+          - id: "0.0.0.1"
+            interfaces: ["eth2"]
+```
+
+### Bridge with STP Configuration
+
+Configure a bridge with Spanning Tree Protocol:
+
+```yaml
+nodes:
+  - name: SW1
+    role: switch
+    interfaces:
+      eth1:
+        network: net1
+      eth2:
+        network: net2
+    bridges:
+      - name: br0
+        stp: true
+        # members omitted — all non-loopback interfaces used automatically
+```
+
+Generated files:
+
+- `etc/systemd/network/05-br0.netdev` - Bridge interface definition
+- `etc/systemd/network/06-br0.network` - Bridge network configuration
+- `etc/systemd/network/07-eth1-bridge.network` - Bridge port configurations
+
+### IPIP Tunnel Configuration
+
+Create an IPIP tunnel between two routers:
+
+```yaml
+nodes:
+  - name: R1
+    role: router
+    interfaces:
+      eth1:
+        network: transit
+        ip: "203.0.113.1/24"
+    tunnels:
+      - name: tun0
+        type: ipip
+        local: "203.0.113.1"
+        remote: "198.51.100.1"
+        ip: "10.255.0.1/30"
+```
+
+Generated files:
+
+- `etc/systemd/network/25-tun0.netdev` - Tunnel interface definition
+- `etc/systemd/network/25-tun0.network` - Tunnel IP configuration
+
+### Firewall (ACL) Configuration
+
+Configure nftables firewall rules:
+
+```yaml
+nodes:
+  - name: H1
+    role: host
+    interfaces:
+      eth1:
+        network: lan
+        ip: "10.0.1.10/24"
+    services:
+      firewall:
+        impl: nftables
+        rules:
+          - action: accept
+            proto: tcp
+            dport: 22
+          - action: accept
+            proto: tcp
+            dport: 80
+          - action: accept
+            proto: icmp
+          - action: drop
+            src: "0.0.0.0/0"
+```
+
+Generated files:
+
+- `etc/nftables.conf` - nftables configuration with rules
+
+### WireGuard VPN Configuration
+
+Configure WireGuard VPN:
+
+```yaml
+nodes:
+  - name: R1
+    role: router
+    interfaces:
+      eth1:
+        network: wan
+        ip: "203.0.113.1/24"
+    services:
+      wireguard:
+        private_key: "generated-private-key"
+        address: "10.200.0.1/24"
+        listen_port: 51820
+        peers:
+          - public_key: "peer-public-key"
+            allowed_ips: "10.200.0.2/32"
+            endpoint: "203.0.113.2:51820"
+```
+
+Generated files:
+
+- `etc/wireguard/wg0.conf` - WireGuard interface configuration
 
 ## Environment Variables
 
