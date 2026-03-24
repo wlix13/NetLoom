@@ -127,6 +127,11 @@
                   "mac": {
                     "type": "string",
                     "description": "Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated deterministically if omitted."
+                  },
+                  "proxy_arp": {
+                    "type": "array",
+                    "description": "IP addresses for which this interface will proxy ARP replies. Enables IPv4ProxyARP on the interface and registers each address in the neighbour proxy.",
+                    "items": { "type": "string" }
                   }
                 },
                 "allOf": [
