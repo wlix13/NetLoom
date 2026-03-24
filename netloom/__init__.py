@@ -1,6 +1,6 @@
 """NetLoom - Network topology orchestrator."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from .core.application import Application
 from .core.controller import BaseController
