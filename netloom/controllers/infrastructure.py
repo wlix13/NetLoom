@@ -13,7 +13,7 @@ from ..data import ConfigDrive, format_fat16
 
 if TYPE_CHECKING:
     from ..core.application import Application
-    from ..core.vbox import VBoxSettings
+    from ..core.vbox import UartConfig, VBoxSettings
     from ..models.internal import InternalNode, InternalTopology
 
 
@@ -161,10 +161,28 @@ class InfrastructureController(BaseController["Application"]):
 
         self._vbox.storage_ctl(vm_name, self._s.controller_name, add="sata", controller="IntelAhci")
 
-    def _modify_vm_hw(self, node: "InternalNode", topo: "InternalTopology") -> None:
+    def _modify_vm_hw(self, node: "InternalNode", topo: "InternalTopology", uart: "UartConfig", node_idx: int) -> None:
         """Configure VM hardware (RAM, CPU, chipset, boot order)."""
 
         vbox = topo.get_vbox_settings(node)
+
+        if not uart.enabled:
+            uart_args = ["--uart1", "off"]
+        else:
+            uart_args = ["--uart1", uart.io_base, str(uart.irq), "--uartmode1"]
+            mode = uart.mode
+            endpoint = uart.endpoint
+
+            if mode == "tcpserver":
+                if not endpoint.isdigit():
+                    raise ValueError(
+                        f"UART endpoint for tcpserver mode must be an integer port number, but got: '{endpoint}'"
+                    )
+                endpoint = str(int(endpoint) + node_idx)
+            elif mode == "server":
+                endpoint = f"{endpoint}-{node.name}"
+
+            uart_args.extend([mode, endpoint])
 
         self._vbox.modify_vm(
             node.name,
@@ -180,6 +198,7 @@ class InfrastructureController(BaseController["Application"]):
             "on" if vbox.hpet else "off",
             "--paravirtprovider",
             vbox.paravirt_provider,
+            *uart_args,
             "--boot1",
             "disk",
             "--boot2",
@@ -238,8 +257,9 @@ class InfrastructureController(BaseController["Application"]):
 
         self._ensure_base_imported(topo)
         existing_vms = self._vbox.list_vms()
+        uart = self._vbox.get_uart_config(self._s.base_vm_name)
 
-        for node in topo.nodes:
+        for node_idx, node in enumerate(topo.nodes, start=1):
             vm_dir = self._vm_dir(node)
             vm_dir.mkdir(parents=True, exist_ok=True)
 
@@ -251,7 +271,7 @@ class InfrastructureController(BaseController["Application"]):
                     basefolder=self._s.basefolder,
                 )
 
-            self._modify_vm_hw(node, topo)
+            self._modify_vm_hw(node, topo, uart, node_idx)
             self._wire_nics(node)
 
             cfg_vmdk = self._cfg_vmdk(node)
