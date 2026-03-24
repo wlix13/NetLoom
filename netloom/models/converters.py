@@ -42,10 +42,35 @@ class TopologyConverter:
         self.workdir = Path(workdir)
         self._nic_allocations: dict[str, set[int]] = {}
 
-    def _allocate_nic_index(self, node_name: str, ifname: str) -> int:
+    def _get_reserved_slots(self, node_name: str) -> set[int]:
+        """Collect slots claimed by explicit indices or ethN naming on node."""
+
+        reserved: set[int] = set()
+        node = self.topology.get_node(node_name)
+        if node and node.interfaces:
+            for name, iface_cfg in node.interfaces.items():
+                if iface_cfg.network is None:
+                    continue
+                if iface_cfg.index is not None:
+                    reserved.add(iface_cfg.index)
+                elif name.startswith("eth") and name[3:].isdigit():
+                    reserved.add(int(name[3:]) + 1)
+
+        return reserved
+
+    def _allocate_nic_index(self, node_name: str, ifname: str, explicit_idx: int | None = None) -> int:
         """Allocate a VirtualBox NIC index for an interface."""
 
         allocations = self._nic_allocations.setdefault(node_name, set())
+
+        # Explicit index from YAML takes highest priority
+        if explicit_idx is not None:
+            if explicit_idx in allocations:
+                raise TopologyError(
+                    f"NIC index collision on node '{node_name}': Slot {explicit_idx} (for '{ifname}') is already used."
+                )
+            allocations.add(explicit_idx)
+            return explicit_idx
 
         # If name is ethN, try to force specific slot
         if ifname.startswith("eth") and ifname[3:].isdigit():
@@ -58,16 +83,8 @@ class TopologyConverter:
             allocations.add(requested_idx)
             return requested_idx
 
-        # Prevent fallback allocations from stealing explicitly declared ethN slots
-        reserved_slots = set()
-        for node in self.topology.nodes:
-            if node.name == node_name and node.interfaces:
-                for name in node.interfaces:
-                    if name.startswith("eth") and name[3:].isdigit():
-                        reserved_slots.add(int(name[3:]) + 1)
-                break
-
-        # For custom names, find first available slot
+        # For custom names, find first available slot avoiding allocated
+        reserved_slots = self._get_reserved_slots(node_name)
         for i in range(1, 37):
             if i not in allocations and i not in reserved_slots:
                 allocations.add(i)
@@ -343,7 +360,7 @@ class TopologyConverter:
                 iface_config = participant_node.interfaces[iface_name]
 
                 mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node_name}-{iface_name}")
-                vbox_nic_index = self._allocate_nic_index(node_name, iface_name)
+                vbox_nic_index = self._allocate_nic_index(node_name, iface_name, iface_config.index)
 
                 peer_node: str | None = None
                 if len(participants) == 2:

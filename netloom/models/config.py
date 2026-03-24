@@ -79,6 +79,12 @@ class InterfaceConfig(BaseModel):
             "'loopback' is OS-only: no VirtualBox NIC, no MAC, skips .link template."
         ),
     )
+    index: int | None = Field(
+        default=None,
+        ge=1,
+        le=36,
+        description="VirtualBox adapter slot (1-36). Auto-assigned if omitted.",
+    )
     mac: str | None = Field(
         default=None,
         description="Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated if omitted.",
@@ -105,9 +111,27 @@ class InterfaceConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _loopback_must_not_have_network(self) -> "InterfaceConfig":
+    def _loopback_no_network(self) -> "InterfaceConfig":
+        """Validate that loopback interface don't have network."""
+
         if self.kind == InterfaceKind.LOOPBACK and self.network is not None:
             raise ValueError("A 'loopback' interface cannot have 'network' set.")
+        return self
+
+    @model_validator(mode="after")
+    def _loopback_no_index(self) -> "InterfaceConfig":
+        """Validate that loopback interface don't have index."""
+
+        if self.kind == InterfaceKind.LOOPBACK and self.index is not None:
+            raise ValueError("A 'loopback' interface cannot have 'index' set.")
+        return self
+
+    @model_validator(mode="after")
+    def _index_requires_network(self) -> "InterfaceConfig":
+        """Validate that loopback interface don't have index."""
+
+        if self.index is not None and self.network is None:
+            raise ValueError("An interface with 'index' set must also set 'network'.")
         return self
 
 
