@@ -93,6 +93,9 @@ class InternalInterface(BaseModel):
     bridge_name: str | None = None
     """Name of the bridge this interface is a port of, if any."""
 
+    proxy_arp: list[str] = Field(default_factory=list)
+    """IP addresses for which this interface proxies ARP replies."""
+
     configured: bool = True
     """Whether to generate config."""
 

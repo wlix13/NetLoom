@@ -380,6 +380,7 @@ class TopologyConverter:
                         network=vbox_net,
                         peer_node=peer_node,
                         configured=iface_config.configured,
+                        proxy_arp=iface_config.proxy_arp,
                     )
                 )
 

@@ -109,6 +109,10 @@ class InterfaceConfig(BaseModel):
         default=True,
         description="If false, config file is NOT generated.",
     )
+    proxy_arp: list[str] = Field(
+        default_factory=list,
+        description="IP addresses for which this interface will proxy ARP replies (e.g. ['10.40.60.100']).",
+    )
 
     @model_validator(mode="after")
     def _loopback_no_network(self) -> "InterfaceConfig":
