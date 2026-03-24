@@ -148,6 +148,7 @@ Interface configurations as a **named map** (key = interface name). This replace
 | `mtu`        | integer | -          | MTU override. Uses OS default if omitted.                                        |
 | `mac`        | string  | -          | Static MAC address (e.g., `02:00:00:00:00:01`). Auto-generated if omitted.       |
 | `configured` | boolean | `true`     | If `false`, no config file is generated                                          |
+| `proxy_arp`  | array   | `[]`       | IP addresses for which this interface will proxy ARP replies                     |
 
 ```yaml
 interfaces:
@@ -168,6 +169,23 @@ interfaces:
     network: transit
     configured: false    # unmanaged - no config file generated
 ```
+
+#### proxy_arp
+
+When set, NetLoom adds `IPv4ProxyARP=yes` to the interface's `.network` file and emits an `[IPv4ProxyARPAddress]` section for each listed IP. systemd-networkd then sets `net.ipv4.conf.<iface>.proxy_arp=1` via sysctl and populates the kernel's neighbour proxy table - so the interface will respond to ARP requests for those addresses on behalf of hosts on another segment.
+
+This is useful when a host with a `/32` address sits on a point-to-point link that shares an IP range with a `/24` network: the router proxies ARP for that host toward the `/24` side.
+
+```yaml
+interfaces:
+  eth2:
+    network: deepnet
+    ip: "10.40.60.2/24"
+    proxy_arp:
+      - "10.40.60.100"   # answer ARP for this /32 host on eth2
+```
+
+Requires systemd-networkd ≥ 255 (Arch Linux, Alpine 3.20+).
 
 !!! info "Interface kinds"
     - `physical` interfaces get a VirtualBox NIC when `network` is set.
