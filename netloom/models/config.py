@@ -109,6 +109,10 @@ class InterfaceConfig(BaseModel):
         default=True,
         description="If false, config file is NOT generated.",
     )
+    nat: bool = Field(
+        default=False,
+        description=("Attach a VirtualBox NAT adapter for internet access via host NAT."),
+    )
 
     @model_validator(mode="after")
     def _loopback_no_network(self) -> "InterfaceConfig":
@@ -127,11 +131,19 @@ class InterfaceConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _index_requires_network(self) -> "InterfaceConfig":
-        """Validate that loopback interface don't have index."""
+    def _loopback_no_nat(self) -> "InterfaceConfig":
+        """Validate that loopback interface don't have nat."""
 
-        if self.index is not None and self.network is None:
-            raise ValueError("An interface with 'index' set must also set 'network'.")
+        if self.kind == InterfaceKind.LOOPBACK and self.nat:
+            raise ValueError("A 'loopback' interface cannot have 'nat' set.")
+        return self
+
+    @model_validator(mode="after")
+    def _nat_no_network(self) -> "InterfaceConfig":
+        """Validate that nat and network are mutually exclusive."""
+
+        if self.nat and self.network is not None:
+            raise ValueError("'nat' and 'network' are mutually exclusive.")
         return self
 
 

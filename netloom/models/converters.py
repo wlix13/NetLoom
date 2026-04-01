@@ -49,7 +49,8 @@ class TopologyConverter:
         node = self.topology.get_node(node_name)
         if node and node.interfaces:
             for name, iface_cfg in node.interfaces.items():
-                if iface_cfg.network is None:
+                will_have_nic = iface_cfg.kind == InterfaceKind.PHYSICAL
+                if not will_have_nic:
                     continue
                 if iface_cfg.index is not None:
                     reserved.add(iface_cfg.index)
@@ -395,24 +396,64 @@ class TopologyConverter:
                     )
                 )
 
-        # Add standalone interfaces (no network, e.g. loopback)
+        # Add standalone interfaces (no network, e.g. loopback, nat, none-mode)
         for node in topo.nodes:
             if not node.interfaces:
                 continue
             for iface_name, iface_config in node.interfaces.items():
                 if iface_config.network is not None:
                     continue
-                node_interfaces[node.name].append(
-                    InternalInterface(
-                        name=iface_name,
-                        kind=iface_config.kind,
-                        ip=iface_config.ip,
-                        gateway=iface_config.gateway,
-                        dhcp=iface_config.dhcp,
-                        mtu=iface_config.mtu,
-                        configured=iface_config.configured,
+
+                if iface_config.nat:
+                    # NAT mode: allocate a VirtualBox NIC slot, internet via host NAT
+                    mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node.name}-{iface_name}")
+                    vbox_nic_index = self._allocate_nic_index(node.name, iface_name, iface_config.index)
+                    node_interfaces[node.name].append(
+                        InternalInterface(
+                            name=iface_name,
+                            kind=iface_config.kind,
+                            mac_address=mac,
+                            ip=iface_config.ip,
+                            gateway=iface_config.gateway,
+                            dhcp=iface_config.dhcp,
+                            mtu=iface_config.mtu,
+                            vbox_nic_index=vbox_nic_index,
+                            nat=True,
+                            configured=iface_config.configured,
+                        )
                     )
-                )
+
+                elif iface_config.kind == InterfaceKind.PHYSICAL:
+                    # None mode: physical interface, slot reserved but disconnected
+                    mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node.name}-{iface_name}")
+                    vbox_nic_index = self._allocate_nic_index(node.name, iface_name, iface_config.index)
+                    node_interfaces[node.name].append(
+                        InternalInterface(
+                            name=iface_name,
+                            kind=iface_config.kind,
+                            mac_address=mac,
+                            ip=iface_config.ip,
+                            gateway=iface_config.gateway,
+                            dhcp=iface_config.dhcp,
+                            mtu=iface_config.mtu,
+                            vbox_nic_index=vbox_nic_index,
+                            configured=iface_config.configured,
+                        )
+                    )
+
+                else:
+                    # Loopback interfaces have no VirtualBox NIC
+                    node_interfaces[node.name].append(
+                        InternalInterface(
+                            name=iface_name,
+                            kind=iface_config.kind,
+                            ip=iface_config.ip,
+                            gateway=iface_config.gateway,
+                            dhcp=iface_config.dhcp,
+                            mtu=iface_config.mtu,
+                            configured=iface_config.configured,
+                        )
+                    )
 
         # Build internal nodes
         internal_nodes: list[InternalNode] = []

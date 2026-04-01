@@ -81,6 +81,9 @@ class InternalInterface(BaseModel):
     network: str | None = None
     """VirtualBox internal network name (acts as L2 switch)."""
 
+    nat: bool = False
+    """Whether this interface uses VirtualBox NAT mode."""
+
     dhcp: bool = False
     """Enable DHCP on this interface."""
 
@@ -107,6 +110,8 @@ class InternalInterface(BaseModel):
                 }.items()
                 if value is not None
             ]
+            if self.nat:
+                invalid.append("nat")
             if invalid:
                 raise ValueError(f"{self.kind.value} interfaces cannot set {', '.join(invalid)}")
 
