@@ -127,6 +127,11 @@
                   "mac": {
                     "type": "string",
                     "description": "Static MAC address (e.g. 02:00:00:00:00:01). Auto-generated deterministically if omitted."
+                  },
+                  "nat": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Attach a VirtualBox NAT adapter for internet access via host NAT. Mutually exclusive with 'network'. Cannot be set on loopback interfaces."
                   }
                 },
                 "allOf": [
@@ -136,10 +141,15 @@
                       "not": {
                         "anyOf": [
                           { "required": ["network"] },
-                          { "required": ["index"] }
+                          { "required": ["index"] },
+                          { "required": ["nat"] }
                         ]
                       }
                     }
+                  },
+                  {
+                    "if": { "properties": { "nat": { "const": true } } },
+                    "then": { "not": { "required": ["network"] } }
                   }
                 ],
                 "additionalProperties": false
