@@ -44,12 +44,9 @@ lint.isort.lines-after-imports = 2
 environment.root = [ "." ]
 
 [tool.poe]
-tasks.format = "ruff format ."
-tasks.check-format = "ruff format --check ."
-tasks.lint = "ruff check ."
-tasks.typecheck = "ty check"
+tasks.format = "uv run ruff format ."
+tasks.check-format = "uv run ruff format --check ."
+tasks.lint = "uv run ruff check ."
+tasks.typecheck = "uv run ty check"
 tasks.check = [ "check-format", "lint", "typecheck" ]
-tasks.docs.sequence = [
-  { cmd = "uv sync --group docs" },
-  { cmd = "mkdocs serve -f mkdocs.yaml" },
-]
+tasks.docs = "uv run --group docs mkdocs serve -f mkdocs.yaml"
