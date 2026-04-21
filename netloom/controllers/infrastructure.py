@@ -227,20 +227,50 @@ class InfrastructureController(BaseController["Application"]):
             if iface.vbox_nic_index is None:
                 continue
 
-            intnet = iface.network or f"intnet:{node.name}-{iface.name}"
-            args = [
-                f"--nic{iface.vbox_nic_index}",
-                "intnet",
-                f"--intnet{iface.vbox_nic_index}",
-                intnet,
-                f"--nictype{iface.vbox_nic_index}",
-                node.nic_model.vbox_type,
-                f"--cableconnected{iface.vbox_nic_index}",
-                "on",
-            ]
+            idx = iface.vbox_nic_index
+            nic_type = node.nic_model.vbox_type
+            mac_address = iface.mac_address.replace(":", "") if iface.mac_address else None
 
-            if iface.mac_address:
-                args.extend([f"--macaddress{iface.vbox_nic_index}", iface.mac_address.replace(":", "")])
+            if iface.nat:
+                args = [
+                    f"--nic{idx}",
+                    "nat",
+                    f"--nictype{idx}",
+                    nic_type,
+                    f"--cableconnected{idx}",
+                    "on",
+                ]
+                if mac_address:
+                    args.extend([f"--macaddress{idx}", mac_address])
+
+            elif iface.network is not None:
+                args = [
+                    f"--nic{idx}",
+                    "intnet",
+                    f"--intnet{idx}",
+                    iface.network,
+                    f"--nictype{idx}",
+                    nic_type,
+                    f"--cableconnected{idx}",
+                    "on",
+                    f"--nicpromisc{idx}",
+                    "allow-all",
+                ]
+                if mac_address:
+                    args.extend([f"--macaddress{idx}", mac_address])
+
+            else:
+                # Null mode: NIC hardware present in guest but no internet connectivity.
+                args = [
+                    f"--nic{idx}",
+                    "null",
+                    f"--nictype{idx}",
+                    nic_type,
+                    f"--cableconnected{idx}",
+                    "on",
+                ]
+                if mac_address:
+                    args.extend([f"--macaddress{idx}", mac_address])
 
             self._vbox.modify_vm(node.name, *args)
 

@@ -229,7 +229,18 @@ class ConfigController(BaseController["Application"]):
                 # VLAN parent interfaces are fully configured by vlan-parent.network; skip their .network file
                 if not is_link_template and (iface.bridge_name is not None or iface.name in vlan_parents):
                     continue
-                yield Path(output_path_str.replace("{iface}", iface.name)), {**context, "iface": iface}
+                if is_link_template:
+                    # Higher VBox slot → lower file priority number → processed first by udev.
+                    # This unwinds rename chains from the tail so that, e.g., eth2→eth3 fires
+                    # before eth1→eth2 fires before eth0→eth1, avoiding name-in-use conflicts.
+                    slot = iface.vbox_nic_index if iface.vbox_nic_index is not None else 1
+                    priority = 46 - slot  # slot 1→45, slot 2→44, …, slot 36→10
+                    yield (
+                        Path(output_path_str).parent / f"{priority:02d}-{iface.name}.link",
+                        {**context, "iface": iface},
+                    )
+                else:
+                    yield Path(output_path_str.replace("{iface}", iface.name)), {**context, "iface": iface}
 
     def _get_output_path(self, template_stem: str, node: "InternalNode", outdir: Path) -> Path | None:
         """Map template stem to output file path."""
