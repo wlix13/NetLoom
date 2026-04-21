@@ -23,6 +23,7 @@ click.rich_click.COMMAND_GROUPS = {
         {"name": "Lab Lifecycle", "commands": ["up", "down"]},
         {"name": "Step-by-step", "commands": ["steps"]},
         {"name": "Config Management", "commands": ["save", "restore", "list-templates"]},
+        {"name": "Runtime", "commands": ["status", "connect"]},
         {"name": "Info", "commands": ["show", "install-completion"]},
     ],
     "netloom steps": [
