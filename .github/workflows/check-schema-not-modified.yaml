@@ -1,0 +1,17 @@
+name: 🔒 Schema not manually modified
+
+on:
+  pull_request:
+    paths:
+      - "schemas/topology-schema.json"
+
+jobs:
+  check:
+    name: 🚫 Block manual schema.json edits
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail — schema.json must not be edited manually
+        run: |
+          echo "::error file=schemas/topology-schema.json::schemas/topology-schema.json is auto-generated. Do not edit it manually — it is updated automatically on push to main."
+          exit 1
