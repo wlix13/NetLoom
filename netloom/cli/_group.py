@@ -73,6 +73,13 @@ click.rich_click.COMMAND_GROUPS = {
     help="Snapshot used for linked clones.",
 )
 @click.option(
+    "--no-x86-on-arm",
+    "no_x86_on_arm",
+    is_flag=True,
+    default=False,
+    help="Disable auto-enabling VBox's x86-on-ARM emulator macOS (globally).",
+)
+@click.option(
     "--debug",
     is_flag=True,
     default=False,
@@ -87,6 +94,7 @@ def cli(
     ova_path: str | None,
     base_vm_name: str,
     snapshot_name: str,
+    no_x86_on_arm: bool,
     debug: bool,
 ) -> None:
     """NetLoom topology orchestrator."""
@@ -102,7 +110,11 @@ def cli(
     app.workdir = Path(workdir)
     app.debug = debug
 
-    vbox_settings = VBoxSettings(base_vm_name=base_vm_name, snapshot_name=snapshot_name)
+    vbox_settings = VBoxSettings(
+        base_vm_name=base_vm_name,
+        snapshot_name=snapshot_name,
+        enable_x86_on_arm=not no_x86_on_arm,
+    )
     if basefolder:
         vbox_settings.basefolder = Path(basefolder)
     if ova_path:

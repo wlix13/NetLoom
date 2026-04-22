@@ -5,9 +5,10 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..core.arch import host_needs_x86_emulation, ova_is_x86
 from ..core.controller import BaseController
 from ..core.enums import VMControlAction, VMState
-from ..core.vbox import VBoxManage
+from ..core.vbox import X86_ON_ARM_KEY, VBoxManage
 from ..data import ConfigDrive, format_fat16
 
 
@@ -52,6 +53,38 @@ class InfrastructureController(BaseController["Application"]):
                 return line.split("=", 1)[1].strip('"')
 
         return None
+
+    def _ensure_x86_on_arm(self, ova_path: Path) -> None:
+        """On arm64 macOS, enable VBox's experimental x86-on-ARM emulator for x86 OVAs."""
+
+        if not self._s.enable_x86_on_arm:
+            return
+        if not host_needs_x86_emulation():
+            return
+        if not ova_is_x86(ova_path):
+            return
+
+        current = self._vbox.get_extradata_global(X86_ON_ARM_KEY)
+        if current == "1":
+            self.console.print("[dim]x86-on-ARM emulation already active[/dim]")
+            return
+
+        self._vbox.set_extradata_global(X86_ON_ARM_KEY, "1")
+        self.console.print(
+            "[yellow]Enabled experimental x86-on-ARM emulation (VBox Dev Preview). "
+            "Guest performance will be significantly slower than native.[/yellow]"
+        )
+
+    def _reset_x86_on_arm(self) -> None:
+        """On arm64 macOS, clear the global x86-on-ARM emulation flag."""
+
+        if not host_needs_x86_emulation():
+            return
+        if self._vbox.get_extradata_global(X86_ON_ARM_KEY) is None:
+            return
+
+        self._vbox.set_extradata_global(X86_ON_ARM_KEY)
+        self.console.print("[dim]Cleared x86-on-ARM emulation flag.[/dim]")
 
     def _cleanup_orphaned_base_media(self) -> None:
         """Remove any orphaned disk media from a previous failed import."""
@@ -130,6 +163,8 @@ class InfrastructureController(BaseController["Application"]):
 
         if not self._s.ova_path:
             raise SystemExit("Base VM not found and --ova is not provided to import it.")
+
+        self._ensure_x86_on_arm(self._s.ova_path)
 
         self._cleanup_orphaned_base_media()
         self._s.basefolder.mkdir(parents=True, exist_ok=True)
@@ -383,6 +418,7 @@ class InfrastructureController(BaseController["Application"]):
         if destroy_base:
             self.console.print(f"[dim]Destroying base VM '{self._s.base_vm_name}'...[/dim]")
             self._destroy_vm(self._s.base_vm_name)
+            self._reset_x86_on_arm()
 
     def get_configdrive(self, node: "InternalNode") -> ConfigDrive:
         """Return the ConfigDrive handle for a node."""

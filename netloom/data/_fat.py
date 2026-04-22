@@ -1,14 +1,33 @@
 """Low-level FAT filesystem helpers for config-drive I/O."""
 
+import os
+import platform
+import stat
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from FATtools import FAT, mkfat
+from FATtools import disk as _fd
 from FATtools.disk import disk
 
 from .constants import BOOT_SECTOR_SIZE, FAT_BITS, MB
+
+
+# Monkey patch for macOS
+# FATtools' macOS get_size uses DKIOCGETBLOCKCOUNT, which only works on block
+# devices. Fall back to os.stat() for regular files
+if platform.system() == "Darwin":
+    _orig_get_size = _fd.get_size  # ty: ignore[unresolved-attribute]
+
+    def _get_size_darwin(name: str) -> int:
+        st = os.stat(name)
+        if stat.S_ISREG(st.st_mode):
+            return st.st_size
+        return _orig_get_size(name)
+
+    _fd.get_size = _get_size_darwin  # ty: ignore[unresolved-attribute]
 
 
 @contextmanager
