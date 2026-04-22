@@ -1,6 +1,6 @@
 """Enhanced BaseModel with rich display capabilities."""
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 from rich.console import Console
@@ -32,7 +32,7 @@ class DisplayModel(BaseModel):
             console = Console()
 
         tree = Tree(f"[bold]{title or self.__class__.__name__}[/bold]")
-        self._build_tree(tree, dict(self))
+        self._build_tree(tree, self)
         console.print(tree)
 
     def _format_value(self, value: Any) -> str:
@@ -52,16 +52,17 @@ class DisplayModel(BaseModel):
             return f"<{value.__class__.__name__}>"
         return str(value)
 
-    def _build_tree(self, parent: Tree, data: dict[str, Any]) -> None:
+    def _build_tree(self, parent: Tree, data: BaseModel | dict[str, Any]) -> None:
         """Build a tree from nested data."""
 
-        for key, value in data.items():
+        pairs = iter(data) if isinstance(data, BaseModel) else data.items()
+        for key, value in pairs:
             if value is None:
                 continue
 
             if isinstance(value, BaseModel):
                 branch = parent.add(f"[cyan]{key}[/cyan]")
-                self._build_tree(branch, dict(value))
+                self._build_tree(branch, value)
             elif isinstance(value, list):
                 if not value:
                     parent.add(f"[cyan]{key}[/cyan]: []")
@@ -69,7 +70,7 @@ class DisplayModel(BaseModel):
                     branch = parent.add(f"[cyan]{key}[/cyan] [{len(value)} items]")
                     for i, item in enumerate(value):
                         item_branch = branch.add(f"[dim]{i}[/dim]")
-                        self._build_tree(item_branch, dict(item))
+                        self._build_tree(item_branch, cast(BaseModel, item))
                 else:
                     parent.add(f"[cyan]{key}[/cyan]: {', '.join(str(v) for v in value)}")
             elif isinstance(value, dict):

@@ -4,7 +4,6 @@ requires = [ "hatchling" ]
 
 [project]
 name = "netloom"
-version = "0.2.3"
 description = "Utility for creating and managing topologies for network labs."
 maintainers = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
 authors = [ { name = "Renat Mustafin", email = "mustafinrr.rm@gmail.com" } ]
@@ -14,6 +13,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
 ]
+dynamic = [ "version" ]
 dependencies = [
   "fattools",
   "jinja2",
@@ -34,6 +34,7 @@ build.targets.sdist.include = [ "netloom/**/*.py", "netloom/templates/**/*.j2" ]
 build.targets.wheel.packages = [ "netloom" ]
 build.targets.wheel.sources.netloom = "netloom"
 metadata.allow-direct-references = true
+version.path = "netloom/__init__.py"
 
 [tool.ruff]
 line-length = 120
@@ -44,12 +45,9 @@ lint.isort.lines-after-imports = 2
 environment.root = [ "." ]
 
 [tool.poe]
-tasks.format = "ruff format ."
-tasks.check-format = "ruff format --check ."
-tasks.lint = "ruff check ."
-tasks.typecheck = "ty check"
+tasks.format = "uv run ruff format ."
+tasks.check-format = "uv run ruff format --check ."
+tasks.lint = "uv run ruff check ."
+tasks.typecheck = "uv run ty check"
 tasks.check = [ "check-format", "lint", "typecheck" ]
-tasks.docs.sequence = [
-  { cmd = "uv sync --group docs" },
-  { cmd = "mkdocs serve -f mkdocs.yaml" },
-]
+tasks.docs = "uv run --group docs mkdocs serve -f mkdocs.yaml"

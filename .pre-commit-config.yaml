@@ -5,7 +5,7 @@ default_install_hook_types:
   - post-rewrite
 repos:
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.18.1
+    rev: v2.21.1
     hooks:
       - id: pyproject-fmt
 
@@ -24,13 +24,13 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.9
+    rev: 0.11.7
     hooks:
       - id: uv-lock
       - id: uv-sync
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.11
     hooks:
       - id: ruff-check
         args: [--fix]

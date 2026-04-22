@@ -1,33 +1,27 @@
 ## Type
 
-<!-- Check ONE that best describes this PR -->
+<!-- Check ONE type + any applicable components -->
 
-- [ ] `feature` - New feature or functionality
-- [ ] `bug` - Bug fix
-- [ ] `enhancement` - Improvement to existing functionality
-- [ ] `breaking-change` - Changes that break backward compatibility
-- [ ] `refactor` - Code refactoring
-- [ ] `docs` - Documentation only
-- [ ] `tests` - Adding or updating tests
-- [ ] `ci-cd` - CI/CD and workflow changes
-- [ ] `dependencies` - Dependency updates
-- [ ] `performance` - Performance improvements
-- [ ] `security` - Security fixes
+- [ ] **Bug fix** (fixes an issue in config generation, topology loading, or CLI behavior)
+- [ ] **New feature** (adds a new CLI command, topology capability, or generation feature)
+- [ ] **Enhancement** (improves existing generation logic, CLI output, or UX)
+- [ ] **Breaking change** (breaks topology YAML compatibility or CLI)
+- [ ] **Refactor** (internal restructuring without behavior change)
+- [ ] **Documentation** (updates to guides, inline docs, or user docs)
+- [ ] **Tests** (adding or updating tests)
+- [ ] **CI/CD** (changes to workflows or automation)
+- [ ] **Dependencies** (updates to dependencies)
 
 ## Component
 
-<!-- Check if applicable -->
+<!-- Check all that apply -->
 
-- [ ] `cli` - CLI commands and interface
-- [ ] `core` - Core framework
-- [ ] `templates` - Jinja2/networkd templates
-- [ ] `config` - Configuration
+- [ ] **CLI** (Commands, options, or output formatting)
+- [ ] **Core** (Application, controllers, or internal model conversion)
+- [ ] **Templates** (Jinja2 templates - networkd, bird, nftables, wireguard)
+- [ ] **Schema** (Topology YAML models, Pydantic validation, or config structures)
 
 ## Description
-
-**What does this PR do?**
-
-<!-- Clear description of what this PR accomplishes -->
 
 **Why is this change needed?**
 
@@ -35,48 +29,30 @@
 
 **Related Issues:** <!-- Fixes #123, Closes #123, or Relates to #123 -->
 
-## Changes
-
-<!-- List changes made -->
-
--
--
-
 ## Testing
 
-- [ ] Tests added/updated
-- [ ] Manual testing completed
-- [ ] No testing required
+### **Automated**
+
+- [ ] Tests added/updated for new behavior
+- [ ] `uv run pytest` passes
+
+### **Manual**
+
+- [ ] CLI tested locally (`uv run netloom --topology <file> <command>`)
+- [ ] Generated configs reviewed (if templates changed)
+- [ ] N/A — no runtime behavior changed
 
 ## Checklist
 
-- [ ] Code follows project style
+<!-- Ensure all applicable items are completed before requesting review -->
+
+- [ ] Code follows project style guidelines
 - [ ] Self-review completed
-- [ ] Tests pass locally
-- [ ] Documentation updated (if needed)
+- [ ] Linter and type checker pass (`uv run ruff check .` and `uv run ty check`)
+- [ ] Documentation updated (if applicable)
 
 ### Version Bumping
 
+<!-- If changing generation behavior or CLI behavior don't forget to bump version -->
+
 - [ ] Version bumped in `__init__.py`
-- [ ] Version bumped in `pyproject.toml`
-- [ ] Version bumped in `uv.lock`
-
----
-
-<!-- OPTIONAL: Remove sections that don't apply -->
-
-## Breaking Changes
-
-<!-- If breaking-change is checked -->
-
-**What breaks:**
-
-**Migration guide:**
-
-## Screenshots
-
-<!-- For UI/CLI output changes -->
-
-**Before:**
-
-**After:**

@@ -1,0 +1,48 @@
+name: 🔄 Update JSON schema
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "netloom/models/config.py"
+      - "netloom/core/enums.py"
+      - "netloom/core/types.py"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-schema:
+    name: 🏗️ Update topology-schema.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --group dev
+
+      - name: Generate topology-schema.json
+        run: |
+          uv run python -c "
+          import orjson
+          from netloom.models.config import Topology
+          print(orjson.dumps(Topology.model_json_schema(), option=orjson.OPT_INDENT_2).decode())
+          " > schemas/topology-schema.json
+
+      - name: Open PR with updated schema
+        uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: "chore(schema): update topology-schema.json"
+          branch: chore/update-schema
+          delete-branch: true
+          sign-commits: true
+          title: "chore(schema): update topology-schema.json"
+          body: "Automated schema update triggered by changes to schema models."
+          labels: automated
+          add-paths: schemas/topology-schema.json
