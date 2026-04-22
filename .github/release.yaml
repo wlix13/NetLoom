@@ -26,31 +26,21 @@ changelog:
       labels:
         - core
         - refactor
-    - title: ⚙️ CLI & Commands
+    - title: ⚙️ CLI & Configuration
       labels:
         - cli
+        - config
     - title: 📝 Templates
       labels:
         - templates
-    - title: 🔧 Configuration & CI
+    - title: 🔧 CI/CD & Dependencies
       labels:
-        - config
         - ci-cd
-    - title: 📚 Documentation
+        - dependencies
+    - title: 📚 Documentation & Tests
       labels:
         - docs
-    - title: 📦 Dependencies
-      labels:
-        - dependencies
-    - title: 🧪 Testing
-      labels:
         - tests
-    - title: ⚡ Performance
-      labels:
-        - performance
-    - title: 🔒 Security
-      labels:
-        - security
     - title: 📝 Other
       labels:
         - "*"
