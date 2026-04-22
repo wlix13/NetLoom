@@ -330,7 +330,6 @@ wheels = [
 
 [[package]]
 name = "netloom"
-version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "fattools" },
