@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,15 @@ if TYPE_CHECKING:
     from ..core.application import Application
     from ..core.vbox import UartConfig, VBoxSettings
     from ..models.internal import InternalNode, InternalTopology
+
+
+@dataclass(frozen=True, slots=True)
+class NodeStatus:
+    """Live status for a topology node's VM."""
+
+    name: str
+    state: str | None
+    port: int | None
 
 
 class InfrastructureController(BaseController["Application"]):
@@ -43,7 +53,9 @@ class InfrastructureController(BaseController["Application"]):
     def _has_snapshot(self, vm_name: str, snapshot_name: str) -> bool:
         return snapshot_name in self._vbox.list_snapshots(vm_name)
 
-    def _get_vm_state(self, vm_name: str) -> str | None:
+    def get_vm_state(self, vm_name: str) -> str | None:
+        """Return VMState (e.g. `running`, `poweroff`) or None if VM does not exist."""
+
         info = self._vbox.show_vm_info(vm_name)
         if not info:
             return None
@@ -52,6 +64,29 @@ class InfrastructureController(BaseController["Application"]):
                 return line.split("=", 1)[1].strip('"')
 
         return None
+
+    def get_connection_endpoint(self, vm_name: str) -> tuple[str, int] | None:
+        """Get URI for connecting to VM's UART1 or None if not reachable."""
+
+        cfg = self._vbox.get_uart_config(vm_name)
+        if not cfg.enabled or cfg.mode != "tcpserver" or not cfg.endpoint.isdigit():
+            return None
+
+        return ("127.0.0.1", int(cfg.endpoint))
+
+    def status(self, topo: "InternalTopology", node_name: str | None = None) -> list[NodeStatus]:
+        """Collect live status for every node in the topology."""
+
+        result: list[NodeStatus] = []
+        for node in topo.nodes:
+            if node_name and node.name != node_name:
+                continue
+            state = self.get_vm_state(node.name)
+            endpoint = self.get_connection_endpoint(node.name) if state == VMState.RUNNING else None
+            port = endpoint[1] if endpoint else None
+            result.append(NodeStatus(name=node.name, state=state, port=port))
+
+        return result
 
     def _cleanup_orphaned_base_media(self) -> None:
         """Remove any orphaned disk media from a previous failed import."""
@@ -333,7 +368,7 @@ class InfrastructureController(BaseController["Application"]):
         """Send stop signals to all VMs."""
 
         for node in topo.nodes:
-            state = self._get_vm_state(node.name)
+            state = self.get_vm_state(node.name)
 
             if state is None:
                 self.console.print(f"[yellow]VM '{node.name}' not found, skipping.[/yellow]")
@@ -352,7 +387,7 @@ class InfrastructureController(BaseController["Application"]):
     def _destroy_vm(self, vm_name: str) -> bool:
         """Stop and remove a single VM. Returns True on success."""
 
-        state = self._get_vm_state(vm_name)
+        state = self.get_vm_state(vm_name)
 
         if state is None:
             self.console.print(f"[yellow]VM '{vm_name}' not found, skipping.[/yellow]")
