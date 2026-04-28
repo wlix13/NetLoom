@@ -1,6 +1,7 @@
 """NetLoom core framework."""
 
 from .application import Application
+from .component import BaseComponent
 from .controller import BaseController
 from .enums import (
     FirewallAction,
@@ -10,27 +11,34 @@ from .enums import (
     NodeRole,
     ParavirtProvider,
     RoutingEngine,
-    TemplateSet,
     TunnelType,
     VBoxChipset,
     VMControlAction,
     VMStartType,
     VMState,
 )
-from .errors import ConfigurationError, InfrastructureError, NetLoomError, TopologyError
+from .errors import (
+    ConfigurationError,
+    HypervisorError,
+    InfrastructureError,
+    NetLoomError,
+    TemplateError,
+    TopologyError,
+)
 from .model import DisplayModel
 from .types import AppT
-from .vbox import VBoxManage, VBoxSettings
 
 
 __all__ = [
     "AppT",
     "Application",
+    "BaseComponent",
     "BaseController",
     "ConfigurationError",
     "DisplayModel",
     "FirewallAction",
     "FirewallImpl",
+    "HypervisorError",
     "InfrastructureError",
     "InterfaceKind",
     "NetLoomError",
@@ -38,12 +46,10 @@ __all__ = [
     "NodeRole",
     "ParavirtProvider",
     "RoutingEngine",
-    "TemplateSet",
+    "TemplateError",
     "TopologyError",
     "TunnelType",
     "VBoxChipset",
-    "VBoxManage",
-    "VBoxSettings",
     "VMControlAction",
     "VMStartType",
     "VMState",

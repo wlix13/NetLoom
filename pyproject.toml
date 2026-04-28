@@ -38,8 +38,16 @@ version.path = "netloom/__init__.py"
 
 [tool.ruff]
 line-length = 120
-lint.select = [ "E", "F", "I", "N", "S", "UP", "W", "YTT" ]
+lint.select = [ "D", "E", "F", "I", "N", "S", "UP", "W", "YTT" ]
+lint.ignore = [
+  "D1",   # don't enforce missing docstrings
+  "D202", # allow blank line after function docstring
+  "D301", # allow \b in docstrings (Click paragraph-break marker)
+  "D401", # don't enforce imperative mood
+  "D419", # allow empty docstrings
+]
 lint.isort.lines-after-imports = 2
+lint.pydocstyle.convention = "pep257"
 
 [tool.ty]
 environment.root = [ "." ]

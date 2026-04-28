@@ -80,10 +80,3 @@ class VMStartType(StrEnum):
     HEADLESS = "headless"
     GUI = "gui"
     SDL = "sdl"
-
-
-class TemplateSet(StrEnum):
-    NETWORKD = "networkd"
-    BIRD = "bird"
-    NFTABLES = "nftables"
-    WIREGUARD = "wireguard"

@@ -1,5 +1,7 @@
 """CLI group definition and global options."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import rich_click as click
@@ -8,8 +10,8 @@ from netloom.models.common import load_topology
 from netloom.models.converters import convert_topology
 
 from ..core.application import Application
-from ..core.vbox import VBoxSettings
-from ._paramtypes import DirectoryType, OvaFileType, TopologyFileType
+from ..hypervisors import available_hypervisors, get_hypervisor_class
+from ._paramtypes import DirectoryType, TopologyFileType
 
 
 click.rich_click.USE_RICH_MARKUP = True
@@ -47,31 +49,10 @@ click.rich_click.COMMAND_GROUPS = {
     help="Working directory for generated configs and artifacts.",
 )
 @click.option(
-    "--basefolder",
-    default=None,
-    type=DirectoryType(must_exist=False),
-    help="VirtualBox VM base folder.",
-)
-@click.option(
-    "--ova",
-    "ova_path",
-    default=None,
-    type=OvaFileType(),
-    help="Path to base OVA (used on first init).",
-)
-@click.option(
-    "--base-vm",
-    "base_vm_name",
-    default="Labs-Base",
+    "--hypervisor",
+    default="vbox",
     show_default=True,
-    help="Name for the imported base VM.",
-)
-@click.option(
-    "--snapshot",
-    "snapshot_name",
-    default="golden",
-    show_default=True,
-    help="Snapshot used for linked clones.",
+    help=f"Hypervisor driver. Available: {', '.join(available_hypervisors())}.",
 )
 @click.option(
     "--debug",
@@ -83,12 +64,10 @@ click.rich_click.COMMAND_GROUPS = {
 def cli(
     ctx: click.Context,
     topo_path: str | None,
-    workdir: Path,
-    basefolder: str | None,
-    ova_path: str | None,
-    base_vm_name: str,
-    snapshot_name: str,
+    workdir: str,
+    hypervisor: str,
     debug: bool,
+    **driver_kwargs: object,
 ) -> None:
     """NetLoom topology orchestrator."""
 
@@ -103,12 +82,8 @@ def cli(
     app.workdir = Path(workdir)
     app.debug = debug
 
-    vbox_settings = VBoxSettings(base_vm_name=base_vm_name, snapshot_name=snapshot_name)
-    if basefolder:
-        vbox_settings.basefolder = Path(basefolder)
-    if ova_path:
-        vbox_settings.ova_path = Path(ova_path)
-    app.vbox_settings = vbox_settings
+    driver_cls = get_hypervisor_class(hypervisor)
+    app.hypervisor = driver_cls.from_cli_params(console=app.console, **driver_kwargs)
 
     internal = convert_topology(load_topology(topo_path), workdir=workdir)
     app.workdir.mkdir(parents=True, exist_ok=True)
@@ -118,3 +93,23 @@ def cli(
         "internal": internal,
         "workdir": app.workdir,
     }
+
+
+# Inject the default driver's (vbox) CLI options so they appear in --help
+# and are passed as **driver_kwargs to the callback above.
+_default_driver_cls = get_hypervisor_class("vbox")
+for _opt in _default_driver_cls.cli_options():
+    cli.params.append(_opt)
+
+# Register components and wire their CLI commands onto the group.
+# This happens at import time so commands are visible to Click before any
+# invocation occurs.  app.hypervisor is set later in the cli() callback.
+from netloom.components.config import ConfigComponent  # noqa: E402
+from netloom.components.infrastructure import InfrastructureComponent  # noqa: E402
+
+
+_app = Application.current()
+_app.register(InfrastructureComponent)
+_app.register(ConfigComponent)
+for _component in _app.components.values():
+    _component.expose_cli(cli)

@@ -15,3 +15,11 @@ class InfrastructureError(NetLoomError):
 
 class ConfigurationError(NetLoomError):
     """Raised for template rendering and configuration errors."""
+
+
+class HypervisorError(NetLoomError):
+    """Raised for hypervisor driver failures (missing driver, operation errors)."""
+
+
+class TemplateError(NetLoomError):
+    """Raised for template registry and rendering failures."""

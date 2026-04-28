@@ -1,7 +1,7 @@
-"""NetLoom controllers."""
+"""NetLoom controllers — re-exported from components for backwards compatibility."""
 
-from .config import ConfigController
-from .infrastructure import InfrastructureController
+from netloom.components.config import ConfigController
+from netloom.components.infrastructure import InfrastructureController
 
 
 __all__ = [

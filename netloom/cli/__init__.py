@@ -1,7 +1,7 @@
 """NetLoom CLI package."""
 
-# Import submodules to register commands on the cli group
-from . import completion, infra, lifecycle, manage, runtime, show  # noqa: F401
+# Commands are registered on the cli group by components in _group.py at import time.
+from . import completion  # noqa: F401
 from ._group import cli
 
 
