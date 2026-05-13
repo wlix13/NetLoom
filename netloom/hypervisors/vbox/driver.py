@@ -10,11 +10,12 @@ from typing import TYPE_CHECKING
 import rich_click as click
 from rich.console import Console
 
+from netloom.core.arch import host_needs_x86_emulation, ova_is_x86
 from netloom.core.enums import VMControlAction, VMState
 from netloom.data import ConfigDrive, format_fat16
 
 from ..base import BaseHypervisorDriver, ConnectionInfo
-from .manage import VBoxManage
+from .manage import X86_ON_ARM_KEY, VBoxManage
 from .settings import VBoxSettings
 
 
@@ -33,6 +34,38 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
     def _log(self, msg: str) -> None:
         if self._console:
             self._console.print(msg)
+
+    def _ensure_x86_on_arm(self, ova_path: Path) -> None:
+        """On arm64 macOS, enable VBox's experimental x86-on-ARM emulator for x86 OVAs."""
+
+        if not self._s.enable_x86_on_arm:
+            return
+        if not host_needs_x86_emulation():
+            return
+        if not ova_is_x86(ova_path):
+            return
+
+        current = self._vbox.get_extradata_global(X86_ON_ARM_KEY)
+        if current == "1":
+            self._log("[dim]x86-on-ARM emulation already active[/dim]")
+            return
+
+        self._vbox.set_extradata_global(X86_ON_ARM_KEY, "1")
+        self._log(
+            "[yellow]Enabled experimental x86-on-ARM emulation (VBox Dev Preview). "
+            "Guest performance will be significantly slower than native.[/yellow]"
+        )
+
+    def _reset_x86_on_arm(self) -> None:
+        """On arm64 macOS, clear the global x86-on-ARM emulation flag after base VM teardown."""
+
+        if not host_needs_x86_emulation():
+            return
+        if self._vbox.get_extradata_global(X86_ON_ARM_KEY) is None:
+            return
+
+        self._vbox.set_extradata_global(X86_ON_ARM_KEY)
+        self._log("[dim]Cleared x86-on-ARM emulation flag.[/dim]")
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -242,6 +275,7 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
         if not self._s.ova_path:
             raise SystemExit("Base VM not found and --ova is not provided to import it.")
 
+        self._ensure_x86_on_arm(self._s.ova_path)
         self._cleanup_orphaned_base_media()
         self._s.basefolder.mkdir(parents=True, exist_ok=True)
         self._vbox.import_ova(self._s.ova_path, self._s.base_vm_name, self._s.basefolder)
@@ -332,6 +366,7 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
     def destroy_base_vm(self) -> None:
         self._log(f"[dim]Destroying base VM '{self._s.base_vm_name}'...[/dim]")
         self.destroy_vm(self._s.base_vm_name)
+        self._reset_x86_on_arm()
 
     @classmethod
     def cli_options(cls) -> list[click.Option]:
@@ -360,6 +395,13 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
                 show_default=True,
                 help="Snapshot used for linked clones.",
             ),
+            click.Option(
+                ["--no-x86-on-arm"],
+                "no_x86_on_arm",
+                is_flag=True,
+                default=False,
+                help="Disable auto-enabling VBox's x86-on-ARM emulator on arm64 macOS.",
+            ),
         ]
 
     @classmethod
@@ -375,4 +417,6 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
         ova_path = kwargs.get("ova_path")
         if ova_path:
             settings.ova_path = Path(str(ova_path))
+        if kwargs.get("no_x86_on_arm"):
+            settings.enable_x86_on_arm = False
         return cls(settings, console=rich_console)

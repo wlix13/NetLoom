@@ -9,6 +9,9 @@ from netloom.core.enums import VMStartType
 from .settings import UartConfig
 
 
+X86_ON_ARM_KEY = "VBoxInternal2/EnableX86OnArm"
+
+
 class VBoxManage:
     """Adapter for the VBoxManage CLI."""
 
@@ -31,6 +34,25 @@ class VBoxManage:
             text=True,
             timeout=60,
         ).stdout
+
+    def get_extradata_global(self, key: str) -> str | None:
+        """Get global extradata value for `key`."""
+
+        out = self._probe(["VBoxManage", "getextradata", "global", key]).strip()
+        if not out or "No value set" in out:
+            return None
+        prefix = "Value:"
+        if out.startswith(prefix):
+            return out.removeprefix(prefix).strip()
+        return out
+
+    def set_extradata_global(self, key: str, value: str | None = None) -> None:
+        """Set or delete global extradata key."""
+
+        cmd = ["VBoxManage", "setextradata", "global", key]
+        if value is not None:
+            cmd.append(value)
+        self._run(cmd)
 
     def list_vms(self) -> dict[str, str]:
         """Return {name: uuid} for all registered VMs."""

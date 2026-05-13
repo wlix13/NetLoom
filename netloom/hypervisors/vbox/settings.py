@@ -25,3 +25,4 @@ class VBoxSettings:
     snapshot_name: str = "golden"
     configdrive_mb: int = 128
     controller_name: str = "Disks"
+    enable_x86_on_arm: bool = True

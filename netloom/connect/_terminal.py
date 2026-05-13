@@ -39,8 +39,18 @@ def raw_terminal() -> Iterator[ReadByte]:
     """
 
     if sys.platform == "win32":
+        import ctypes
         import msvcrt
         import time
+
+        _enable_processed_input = 0x0001
+        _std_input_handle = -10
+        _k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        _hstdin = _k32.GetStdHandle(_std_input_handle)
+        _mode = ctypes.c_ulong()
+        _k32.GetConsoleMode(_hstdin, ctypes.byref(_mode))
+        _old_mode = _mode.value
+        _k32.SetConsoleMode(_hstdin, _old_mode & ~_enable_processed_input)
 
         def _read_one() -> bytes:
             b = msvcrt.getch()
@@ -59,7 +69,10 @@ def raw_terminal() -> Iterator[ReadByte]:
                 time.sleep(0.005)
             return None
 
-        yield read_byte
+        try:
+            yield read_byte
+        finally:
+            _k32.SetConsoleMode(_hstdin, _old_mode)
 
     elif sys.platform in ("linux", "darwin"):
         import select
