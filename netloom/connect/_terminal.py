@@ -39,8 +39,20 @@ def raw_terminal() -> Iterator[ReadByte]:
     """
 
     if sys.platform == "win32":
+        import ctypes
         import msvcrt
+        import signal
         import time
+
+        _enable_processed_input = 0x0001
+        _std_input_handle = -10
+        _k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        _hstdin = _k32.GetStdHandle(_std_input_handle)
+        _mode = ctypes.c_ulong()
+        _k32.GetConsoleMode(_hstdin, ctypes.byref(_mode))
+        _old_mode = _mode.value
+        _k32.SetConsoleMode(_hstdin, _old_mode & ~_enable_processed_input)
+        _prev_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         def _read_one() -> bytes:
             b = msvcrt.getch()
@@ -59,7 +71,11 @@ def raw_terminal() -> Iterator[ReadByte]:
                 time.sleep(0.005)
             return None
 
-        yield read_byte
+        try:
+            yield read_byte
+        finally:
+            _k32.SetConsoleMode(_hstdin, _old_mode)
+            signal.signal(signal.SIGINT, _prev_sigint)
 
     elif sys.platform in ("linux", "darwin"):
         import select
@@ -74,7 +90,7 @@ def raw_terminal() -> Iterator[ReadByte]:
         except (termios.error, OSError) as e:
             raise RuntimeError(f"Cannot configure terminal: {e}") from e
         try:
-            tty.setcbreak(fd)
+            tty.setraw(fd)
 
             def read_byte(timeout: float | None) -> bytes | None:
                 r, _, _ = select.select([fd], [], [], timeout)
