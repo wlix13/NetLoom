@@ -10,16 +10,24 @@ Enable [shell completion](shell-completion.md) for faster command entry with tab
 
 All commands require the `--topology` option and accept these global options:
 
-| Option         | Type   | Default            | Description                                           |
-| -------------- | ------ | ------------------ | ----------------------------------------------------- |
-| `--topology`   | Path   | _required_         | Path to topology YAML file                            |
-| `--workdir`    | Path   | `.labs_configs`    | Working directory for generated configs and artifacts |
-| `--basefolder` | Path   | VirtualBox default | VirtualBox VM base folder                             |
-| `--ova`        | Path   | -                  | Path to base OVA (used on first init)                 |
-| `--base-vm`    | String | `Labs-Base`        | Name for the imported base VM                         |
-| `--snapshot`   | String | `golden`           | Snapshot name used for linked clones                  |
-| `--debug`      | Flag   | false              | Enable debug output (writes `_node.json` per node)    |
-| `-h, --help`   | -      | -                  | Show help message                                     |
+| Option              | Type   | Default            | Description                                             |
+| ------------------- | ------ | ------------------ | ------------------------------------------------------- |
+| `--topology`        | Path   | _required_         | Path to topology YAML file                              |
+| `--workdir`         | Path   | `.labs_configs`    | Working directory for generated configs and artifacts   |
+| `--hypervisor`      | String | `vbox`             | Hypervisor driver to use                                |
+| `--faults`          | Path   | -                  | Fault-injection spec: deploy the lab deliberately broken |
+| `--debug`           | Flag   | false              | Enable debug output (writes `_node.json` per node)      |
+| `-h, --help`        | -      | -                  | Show help message                                       |
+
+Driver-specific options are prefixed with the driver name:
+
+| Option                  | Type   | Default            | Description                            |
+| ----------------------- | ------ | ------------------ | -------------------------------------- |
+| `--vbox-basefolder`     | Path   | VirtualBox default | VirtualBox VM base folder              |
+| `--vbox-ova`            | Path   | -                  | Path to base OVA (used on first init)  |
+| `--vbox-base-vm`        | String | `Labs-Base`        | Name for the imported base VM          |
+| `--vbox-snapshot`       | String | `golden`           | Snapshot name used for linked clones   |
+| `--vbox-no-x86-on-arm`  | Flag   | false              | Disable x86-on-ARM emulation on macOS  |
 
 ## Commands
 
@@ -52,7 +60,7 @@ netloom --topology lab.yaml up
 
 ```bash
 # First-time deployment including base VM import
-netloom --topology lab.yaml --ova base.ova up --init
+netloom --topology lab.yaml --vbox-ova base.ova up --init
 
 # Subsequent deployments (base VM already exists)
 netloom --topology lab.yaml up

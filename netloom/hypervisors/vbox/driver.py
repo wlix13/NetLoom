@@ -11,8 +11,9 @@ import rich_click as click
 from rich.console import Console
 
 from netloom.core.arch import host_needs_x86_emulation, ova_is_x86
-from netloom.core.enums import VMControlAction, VMState
-from netloom.data import ConfigDrive, format_fat16
+from netloom.core.enums import NicModel, VMControlAction, VMState
+from netloom.core.errors import HypervisorError
+from netloom.data import CONFIG_DRIVE_LABEL, ConfigDrive, format_fat16
 
 from ..base import BaseHypervisorDriver, ConnectionInfo
 from .manage import X86_ON_ARM_KEY, VBoxManage
@@ -23,8 +24,17 @@ if TYPE_CHECKING:
     from netloom.models.internal import InternalNode, InternalTopology
 
 
+_VBOX_NIC_TYPES: dict[NicModel, str] = {
+    NicModel.VIRTIO: "virtio",
+    NicModel.E1000: "82540EM",
+    NicModel.RTL8139: "Am79C973",
+}
+
+
 class VBoxHypervisorDriver(BaseHypervisorDriver):
     """Hypervisor driver for Oracle VirtualBox via the VBoxManage CLI."""
+
+    name = "vbox"
 
     def __init__(self, settings: VBoxSettings, console: Console | None = None) -> None:
         self._s = settings
@@ -204,11 +214,11 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
             self._vbox.modify_vm(node.name, f"--nic{i}", "none")
 
         for iface in node.interfaces:
-            if iface.vbox_nic_index is None:
+            if iface.nic_slot is None:
                 continue
 
-            idx = iface.vbox_nic_index
-            nic_type = node.nic_model.vbox_type
+            idx = iface.nic_slot
+            nic_type = _VBOX_NIC_TYPES[node.nic_model]
             mac_address = iface.mac_address.replace(":", "") if iface.mac_address else None
 
             if iface.nat:
@@ -241,7 +251,7 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
         path = self._cfg_vmdk(node)
         self._vbox.create_medium(path, size_mb=self._s.configdrive_mb)
         cd = ConfigDrive(path)
-        format_fat16(cd.flat, self._s.configdrive_mb)
+        format_fat16(cd.flat, self._s.configdrive_mb, label=CONFIG_DRIVE_LABEL)
 
     # ── BaseHypervisorDriver implementation ──────────────────────────────────
 
@@ -273,7 +283,7 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
             return
 
         if not self._s.ova_path:
-            raise SystemExit("Base VM not found and --ova is not provided to import it.")
+            raise HypervisorError("Base VM not found and --vbox-ova is not provided to import it.")
 
         self._ensure_x86_on_arm(self._s.ova_path)
         self._cleanup_orphaned_base_media()
@@ -372,32 +382,31 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
     def cli_options(cls) -> list[click.Option]:
         return [
             click.Option(
-                ["--basefolder"],
+                ["--vbox-basefolder", "vbox_basefolder"],
                 default=None,
                 help="VirtualBox VM base folder.",
                 metavar="DIR",
             ),
             click.Option(
-                ["--ova", "ova_path"],
+                ["--vbox-ova", "vbox_ova_path"],
                 default=None,
                 help="Path to base OVA (used on first init).",
                 metavar="FILE",
             ),
             click.Option(
-                ["--base-vm", "base_vm_name"],
+                ["--vbox-base-vm", "vbox_base_vm_name"],
                 default="Labs-Base",
                 show_default=True,
                 help="Name for the imported base VM.",
             ),
             click.Option(
-                ["--snapshot", "snapshot_name"],
+                ["--vbox-snapshot", "vbox_snapshot_name"],
                 default="golden",
                 show_default=True,
                 help="Snapshot used for linked clones.",
             ),
             click.Option(
-                ["--no-x86-on-arm"],
-                "no_x86_on_arm",
+                ["--vbox-no-x86-on-arm", "vbox_no_x86_on_arm"],
                 is_flag=True,
                 default=False,
                 help="Disable auto-enabling VBox's x86-on-ARM emulator on arm64 macOS.",
@@ -407,16 +416,17 @@ class VBoxHypervisorDriver(BaseHypervisorDriver):
     @classmethod
     def from_cli_params(cls, console: object | None = None, **kwargs: object) -> VBoxHypervisorDriver:
         rich_console: Console | None = console if isinstance(console, Console) else None
+        params = cls.strip_own_prefix(kwargs)
         settings = VBoxSettings(
-            base_vm_name=str(kwargs.get("base_vm_name", "Labs-Base")),
-            snapshot_name=str(kwargs.get("snapshot_name", "golden")),
+            base_vm_name=str(params.get("base_vm_name") or "Labs-Base"),
+            snapshot_name=str(params.get("snapshot_name") or "golden"),
         )
-        basefolder = kwargs.get("basefolder")
+        basefolder = params.get("basefolder")
         if basefolder:
             settings.basefolder = Path(str(basefolder))
-        ova_path = kwargs.get("ova_path")
+        ova_path = params.get("ova_path")
         if ova_path:
             settings.ova_path = Path(str(ova_path))
-        if kwargs.get("no_x86_on_arm"):
+        if params.get("no_x86_on_arm"):
             settings.enable_x86_on_arm = False
         return cls(settings, console=rich_console)

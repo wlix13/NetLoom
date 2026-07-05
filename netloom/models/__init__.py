@@ -56,7 +56,7 @@ from .internal import (
     InternalWireguard,
     InternalWireguardPeer,
     NicModel,
-    ifname_to_vbox_adapter_index,
+    ifname_to_nic_slot,
 )
 
 
@@ -107,5 +107,5 @@ __all__ = [
     "InternalWireguard",
     "InternalWireguardPeer",
     "NicModel",
-    "ifname_to_vbox_adapter_index",
+    "ifname_to_nic_slot",
 ]

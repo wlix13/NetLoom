@@ -11,6 +11,8 @@ from netloom.core.controller import BaseController
 from netloom.core.enums import VMState
 from netloom.hypervisors.base import ConnectionInfo
 
+from .errors import NoConsoleConnection, VMNotCreated, VMNotRunning
+
 
 if TYPE_CHECKING:
     from netloom.core.application import Application  # noqa: F401
@@ -40,6 +42,21 @@ class InfrastructureController(BaseController["Application"]):
     def get_connection_info(self, vm_name: str) -> ConnectionInfo | None:
         """Return connection details for console access, or ``None``."""
         return self.app.hypervisor.get_connection_info(vm_name)
+
+    def prepare_connect(self, vm_name: str) -> ConnectionInfo:
+        """Validate that *vm_name* is running and reachable, then return its console endpoint.
+
+        Raises ``VMNotCreated``, ``VMNotRunning`` or ``NoConsoleConnection``.
+        """
+        state = self.get_vm_state(vm_name)
+        if state is None:
+            raise VMNotCreated(vm_name)
+        if state != VMState.RUNNING:
+            raise VMNotRunning(vm_name, str(state))
+        info = self.get_connection_info(vm_name)
+        if info is None:
+            raise NoConsoleConnection(vm_name)
+        return info
 
     def status(self, topo: InternalTopology, node_name: str | None = None) -> list[NodeStatus]:
         """Collect live status for every node in the topology."""

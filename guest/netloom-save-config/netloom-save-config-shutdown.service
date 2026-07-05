@@ -1,0 +1,17 @@
+[Unit]
+Description=Save network configs to the NetLoom config drive at shutdown
+DefaultDependencies=no
+After=local-fs.target
+Before=shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+# Stop order is the reverse of start order: ordered After=local-fs.target,
+# so ExecStop runs while filesystems are still mounted during shutdown.
+ExecStop=/usr/bin/netloom-save-config
+
+[Install]
+WantedBy=multi-user.target

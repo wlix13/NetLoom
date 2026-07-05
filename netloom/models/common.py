@@ -6,16 +6,32 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from ..core.errors import TopologyError
 from .config import Topology
 
 
 def load_topology(path: str | Path) -> Topology:
-    """Load YAML topology file and validate against schema."""
+    """Load a YAML topology file and validate it against the schema.
+
+    Raises ``TopologyError`` for missing files, malformed YAML and schema
+    violations — callers never see raw pydantic/yaml exceptions.
+    """
 
     p = Path(path)
-    data: dict[str, Any] = yaml.safe_load(p.read_text(encoding="utf-8"))
+    try:
+        raw = p.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise TopologyError(f"Cannot read topology file '{p}': {exc}") from exc
+
+    try:
+        data: Any = yaml.safe_load(raw)
+    except yaml.YAMLError as exc:
+        raise TopologyError(f"Invalid YAML in topology file '{p}':\n{exc}") from exc
+
+    if not isinstance(data, dict):
+        raise TopologyError(f"Topology file '{p}' must contain a YAML mapping at the top level.")
 
     try:
         return Topology(**data)
-    except ValidationError as ve:
-        raise SystemExit(f"[Topology Validation Error]\n{ve}") from ve
+    except ValidationError as exc:
+        raise TopologyError(f"Topology validation failed for '{p}':\n{exc}") from exc

@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 _registry: dict[str, type[BaseHypervisorDriver]] = {}
 
 
-def register_hypervisor(name: str, cls: type[BaseHypervisorDriver]) -> None:
-    """Register a hypervisor driver class under *name*."""
-    _registry[name] = cls
+def register_hypervisor(cls: type[BaseHypervisorDriver]) -> None:
+    """Register a hypervisor driver class under its ``cls.name``."""
+    _registry[cls.name] = cls
 
 
 def get_hypervisor_class(name: str) -> type[BaseHypervisorDriver]:
@@ -32,7 +32,7 @@ def available_hypervisors() -> list[str]:
     return sorted(_registry)
 
 
-register_hypervisor("vbox", VBoxHypervisorDriver)
+register_hypervisor(VBoxHypervisorDriver)
 
 __all__ = [
     "BaseHypervisorDriver",

@@ -35,19 +35,11 @@ class FirewallImpl(StrEnum):
 
 
 class NicModel(StrEnum):
+    """Guest-visible NIC model; each hypervisor driver maps it to its own adapter type."""
+
     VIRTIO = "virtio"
     E1000 = "e1000"
     RTL8139 = "rtl8139"
-
-    @property
-    def vbox_type(self) -> str:
-        """Return the VirtualBox NIC adapter type string for this model."""
-
-        return {
-            NicModel.VIRTIO: "virtio",
-            NicModel.E1000: "82540EM",
-            NicModel.RTL8139: "Am79C973",
-        }[self]
 
 
 class VBoxChipset(StrEnum):

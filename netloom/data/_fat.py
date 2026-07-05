@@ -12,7 +12,14 @@ from FATtools import FAT, mkfat
 from FATtools import disk as _fd
 from FATtools.disk import disk
 
-from .constants import BOOT_SECTOR_SIZE, FAT_BITS, MB
+from .constants import (
+    BOOT_SECTOR_SIZE,
+    FAT16_EXT_BOOT_SIG_OFFSET,
+    FAT16_LABEL_OFFSET,
+    FAT16_LABEL_SIZE,
+    FAT_BITS,
+    MB,
+)
 
 
 # Monkey patch for macOS
@@ -63,14 +70,37 @@ def open_fat_fs(flat_path: Path, mode: str = "r+b") -> Generator[Any]:
             d.close()
 
 
-def format_fat16(flat_path: Path, size_mb: int) -> None:
-    """Format raw flat VMDK file as FAT16."""
+def format_fat16(flat_path: Path, size_mb: int, label: str | None = None) -> None:
+    """Format raw flat VMDK file as FAT16, optionally stamping a volume *label*."""
 
     d = disk(str(flat_path), "r+b")
     try:
         mkfat.fat_mkfs(d, size_mb * MB, params={"fat_bits": FAT_BITS})
     finally:
         d.close()
+
+    if label is not None:
+        set_fat16_volume_label(flat_path, label)
+
+
+def set_fat16_volume_label(flat_path: Path, label: str) -> None:
+    """Write *label* into the FAT16 boot-sector volume-label field.
+
+    blkid (and therefore ``/dev/disk/by-label/`` inside guests) falls back to
+    this field when the root directory holds no volume-label entry — which is
+    exactly the state ``fat_mkfs`` leaves the filesystem in.
+    """
+
+    encoded = label.upper().encode("ascii")
+    if not 1 <= len(encoded) <= FAT16_LABEL_SIZE:
+        raise ValueError(f"FAT volume label must be 1-{FAT16_LABEL_SIZE} ASCII characters, got {label!r}")
+
+    with open(flat_path, "r+b") as f:
+        f.seek(FAT16_EXT_BOOT_SIG_OFFSET)
+        if f.read(1) != b"\x29":
+            raise RuntimeError(f"No FAT16 extended boot signature on {flat_path}; cannot set volume label")
+        f.seek(FAT16_LABEL_OFFSET)
+        f.write(encoded.ljust(FAT16_LABEL_SIZE, b" "))
 
 
 def makedirs(fs: Any, rel_path: Path) -> Any:

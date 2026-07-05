@@ -10,14 +10,13 @@ from netloom.models.common import load_topology
 from netloom.models.converters import convert_topology
 
 from ..core.application import Application
+from ..core.paramtypes import DirectoryType, FaultsFileType, TopologyFileType
 from ..hypervisors import available_hypervisors, get_hypervisor_class
-from ._paramtypes import DirectoryType, TopologyFileType
 
 
-click.rich_click.USE_RICH_MARKUP = True
+click.rich_click.TEXT_MARKUP = "rich"
 click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
-click.rich_click.USE_MARKDOWN = False
 click.rich_click.STYLE_ERRORS_SUGGESTION = "dim italic"
 click.rich_click.MAX_WIDTH = 100
 click.rich_click.COMMAND_GROUPS = {
@@ -25,8 +24,12 @@ click.rich_click.COMMAND_GROUPS = {
         {"name": "Lab Lifecycle", "commands": ["up", "down"]},
         {"name": "Step-by-step", "commands": ["steps"]},
         {"name": "Config Management", "commands": ["save", "restore", "list-templates"]},
+        {"name": "Broken Labs", "commands": ["faults"]},
         {"name": "Runtime", "commands": ["status", "connect"]},
         {"name": "Info", "commands": ["show", "install-completion"]},
+    ],
+    "netloom faults": [
+        {"name": "Commands", "commands": ["catalog", "generate", "reveal"]},
     ],
     "netloom steps": [
         {"name": "Commands", "commands": ["init", "create", "gen", "attach", "start", "stop", "destroy"]},
@@ -55,17 +58,25 @@ click.rich_click.COMMAND_GROUPS = {
     help=f"Hypervisor driver. Available: {', '.join(available_hypervisors())}.",
 )
 @click.option(
+    "--faults",
+    "faults_path",
+    default=None,
+    type=FaultsFileType(),
+    help="Apply a fault-injection spec: deploy the lab deliberately broken. [yellow]Instructor option.[/yellow]",
+)
+@click.option(
     "--debug",
     is_flag=True,
     default=False,
     help="Enable debug output (writes _node.json per node).",
 )
 @click.pass_context
-def cli(
+def cli(  # noqa: PLR0913
     ctx: click.Context,
     topo_path: str | None,
     workdir: str,
     hypervisor: str,
+    faults_path: str | None,
     debug: bool,
     **driver_kwargs: object,
 ) -> None:
@@ -88,6 +99,13 @@ def cli(
     internal = convert_topology(load_topology(topo_path), workdir=workdir)
     app.workdir.mkdir(parents=True, exist_ok=True)
 
+    if faults_path:
+        report = app.faults.apply_spec(internal, faults_path)
+        app.console.print(
+            f"[yellow]⚠ Broken-lab mode: {len(report.faults)} fault(s) injected "
+            f"(answer key: {app.faults.answer_key_path}).[/yellow]"
+        )
+
     ctx.obj = {
         "app": app,
         "internal": internal,
@@ -95,21 +113,24 @@ def cli(
     }
 
 
-# Inject the default driver's (vbox) CLI options so they appear in --help
-# and are passed as **driver_kwargs to the callback above.
-_default_driver_cls = get_hypervisor_class("vbox")
-for _opt in _default_driver_cls.cli_options():
-    cli.params.append(_opt)
+# Inject every registered driver's (prefixed) CLI options so they appear in
+# --help and are passed as **driver_kwargs to the callback above.  The
+# selected driver picks out its own parameters via strip_own_prefix().
+for _driver_name in available_hypervisors():
+    for _opt in get_hypervisor_class(_driver_name).cli_options():
+        cli.params.append(_opt)
 
 # Register components and wire their CLI commands onto the group.
 # This happens at import time so commands are visible to Click before any
 # invocation occurs.  app.hypervisor is set later in the cli() callback.
 from netloom.components.config import ConfigComponent  # noqa: E402
+from netloom.components.faults import FaultsComponent  # noqa: E402
 from netloom.components.infrastructure import InfrastructureComponent  # noqa: E402
 
 
 _app = Application.current()
 _app.register(InfrastructureComponent)
 _app.register(ConfigComponent)
+_app.register(FaultsComponent)
 for _component in _app.components.values():
     _component.expose_cli(cli)

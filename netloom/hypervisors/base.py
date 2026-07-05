@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import rich_click as click
 
@@ -35,7 +35,15 @@ class BaseHypervisorDriver(ABC):
     it for a specific hypervisor.  All VirtualBox-specific logic lives in
     ``VBoxHypervisorDriver``; alternative drivers (QEMU, libvirt, …) implement
     the same interface without touching any core code.
+
+    ``name`` doubles as the registry key and the CLI option prefix: every
+    option a driver contributes via ``cli_options()`` must be named
+    ``--<name>-...`` so that options from all registered drivers can coexist
+    on the main command line.
     """
+
+    name: ClassVar[str]
+    """Registry key and CLI option prefix (e.g. ``vbox`` → ``--vbox-ova``)."""
 
     @abstractmethod
     def list_vms(self) -> dict[str, str]:
@@ -83,14 +91,30 @@ class BaseHypervisorDriver(ABC):
 
     @classmethod
     def cli_options(cls) -> list[click.Option]:
-        """Return driver-specific Click options to inject into the main CLI group."""
+        """Return driver-specific Click options to inject into the main CLI group.
+
+        Option flags and parameter names must carry the ``cls.name`` prefix
+        (``--vbox-ova`` / ``vbox_ova_path``); use ``strip_own_prefix()`` in
+        ``from_cli_params()`` to recover the bare names.
+        """
         return []
+
+    @classmethod
+    def strip_own_prefix(cls, kwargs: dict[str, object]) -> dict[str, object]:
+        """Return only this driver's parameters from *kwargs*, prefix removed.
+
+        The main CLI group collects options from *all* registered drivers;
+        each driver picks out its own by the ``<name>_`` parameter prefix.
+        """
+        prefix = cls.name.replace("-", "_") + "_"
+        return {key.removeprefix(prefix): value for key, value in kwargs.items() if key.startswith(prefix)}
 
     @classmethod
     def from_cli_params(cls, console: object | None = None, **kwargs: object) -> BaseHypervisorDriver:
         """Construct a driver instance from parsed CLI option values.
 
-        Subclasses override this to build their settings from *kwargs*.
-        Default calls ``cls()`` (no-args constructor).
+        *kwargs* contains the parameters of every registered driver;
+        subclasses call ``strip_own_prefix(kwargs)`` and build their settings
+        from the result.  Default ignores all options and calls ``cls()``.
         """
         return cls()  # type: ignore[call-arg]

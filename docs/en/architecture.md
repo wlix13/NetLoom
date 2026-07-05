@@ -151,8 +151,8 @@ Runtime representations with computed and enriched fields:
 
 - `InternalTopology` — full topology with node/link indexes
 - `InternalNode` — node with resolved interfaces, computed config dirs
-- `InternalInterface` — interface with `mac_address`, `vbox_nic_index`, `peer_node`, `network`
-- `InternalNetwork` — L2 segment with VirtualBox network name and participant list
+- `InternalInterface` — interface with `mac_address`, `nic_slot`, `peer_node`, `network`
+- `InternalNetwork` — L2 segment with backing network name and participant list
 - `InternalLink` — point-to-point connection (subset of networks with exactly 2 participants)
 - `InternalBridge`, `InternalVLAN`, `InternalTunnel`
 - `InternalRouting`, `InternalServices`, `InternalSysctl`

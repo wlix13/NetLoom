@@ -8,16 +8,19 @@ from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import orjson
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from jinja2.exceptions import TemplateNotFound
-
 from netloom.core.controller import BaseController
 from netloom.core.enums import InterfaceKind, RoutingEngine
+from netloom.core.errors import InfrastructureError, SerialConsoleError
 from netloom.templates.registry import TemplateRegistry, TemplateSetDescriptor
+
+from .serial_sync import build_sync_command
 
 
 if TYPE_CHECKING:
+    # jinja2/orjson are imported lazily inside methods to keep CLI startup
+    # (and shell completion) fast.
+    from jinja2 import Environment
+
     from netloom.core.application import Application
     from netloom.models.internal import InternalNode, InternalTopology
 
@@ -35,6 +38,8 @@ class ConfigController(BaseController["Application"]):
             return p
 
     def get_env(self, extra_paths: list[Path] | None = None) -> Environment:
+        from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
         search_paths = [self.templates_dir]
         if extra_paths:
             search_paths.extend(extra_paths)
@@ -58,12 +63,22 @@ class ConfigController(BaseController["Application"]):
                 result.add(desc.name)
         return result
 
-    def generate(self, topo: InternalTopology, extra_paths: list[Path] | None = None) -> None:
-        """Render all applicable template sets for each node in *topo*."""
+    def generate(
+        self,
+        topo: InternalTopology,
+        node_name: str | None = None,
+        extra_paths: list[Path] | None = None,
+    ) -> None:
+        """Render all applicable template sets for each node in *topo*.
+
+        With *node_name*, only that node is rendered — but templates still see
+        the full topology as context, so cross-node references stay correct.
+        """
 
         env = self.get_env(extra_paths)
+        nodes = [topo.get_node(node_name)] if node_name else topo.nodes
 
-        for node in topo.nodes:
+        for node in nodes:
             if not node.config_dir:
                 continue
 
@@ -162,9 +177,9 @@ class ConfigController(BaseController["Application"]):
                 if not is_link_template and (iface.bridge_name is not None or iface.name in vlan_parents):
                     continue
                 if is_link_template:
-                    # Higher VBox slot → lower file priority → processed first by udev.
+                    # Higher NIC slot → lower file priority → processed first by udev.
                     # Unwinds rename chains from the tail to avoid name-in-use conflicts.
-                    slot = iface.vbox_nic_index if iface.vbox_nic_index is not None else 1
+                    slot = iface.nic_slot if iface.nic_slot is not None else 1
                     priority = 46 - slot
                     yield (
                         Path(output_path_str).parent / f"{priority:02d}-{iface.name}.link",
@@ -189,6 +204,8 @@ class ConfigController(BaseController["Application"]):
         return outdir / relative
 
     def _generate_services_list(self, env: Environment, node: InternalNode, outdir: Path) -> None:
+        from jinja2.exceptions import TemplateNotFound
+
         try:
             template = env.get_template("services/services.list.j2")
             content = template.render(node=node)
@@ -212,6 +229,8 @@ class ConfigController(BaseController["Application"]):
                 (outdir / "services.list").write_text("\n".join(services) + "\n", encoding="utf-8", newline="\n")
 
     def _write_debug_json(self, node: InternalNode, outdir: Path) -> None:
+        import orjson
+
         (outdir / "_node.json").write_bytes(
             orjson.dumps(
                 {
@@ -233,8 +252,16 @@ class ConfigController(BaseController["Application"]):
                 continue
             self.app.hypervisor.inject_configs(node, Path(node.config_dir))
 
-    def save(self, topo: InternalTopology) -> None:
-        """Pull changed files from config media back to saved directory."""
+    def save(self, topo: InternalTopology, *, sync: bool = False) -> None:
+        """Pull changed files from config media back to saved directory.
+
+        With *sync*, first ask each running guest (over its serial console) to
+        copy its live /etc configs onto the config drive, so the extraction
+        below reflects what was actually changed inside the VM.
+        """
+        if sync:
+            self._sync_guests_to_drives(topo)
+
         for node in topo.nodes:
             if not node.saved_configs_dir:
                 continue
@@ -246,6 +273,33 @@ class ConfigController(BaseController["Application"]):
                     self.console.print(f"    - {f.relative_to(saved)}")
             else:
                 self.console.print(f"  [yellow]{node.name}[/yellow]: no files found")
+
+    def _sync_guests_to_drives(self, topo: InternalTopology) -> None:
+        """Serial-exec skeleton: flush each running guest's /etc onto its config drive."""
+        from netloom.connect import SerialShell
+
+        command = build_sync_command()
+        for node in topo.nodes:
+            try:
+                info = self.app.infrastructure.prepare_connect(node.name)
+            except InfrastructureError as exc:
+                self.console.print(f"  [yellow]{node.name}[/yellow]: skipping serial sync ({exc})")
+                continue
+            if info.protocol != "tcp-serial":
+                self.console.print(
+                    f"  [yellow]{node.name}[/yellow]: console protocol '{info.protocol}' unsupported for sync"
+                )
+                continue
+            try:
+                with SerialShell(info.host, info.port) as shell:
+                    result = shell.run(command, timeout=90.0)
+            except SerialConsoleError as exc:
+                self.console.print(f"  [red]{node.name}[/red]: serial sync failed: {exc}")
+                continue
+            if result.exit_code == 0:
+                self.console.print(f"  [green]{node.name}[/green]: guest configs flushed to config drive")
+            else:
+                self.console.print(f"  [red]{node.name}[/red]: guest sync exited with code {result.exit_code}")
 
     def restore(self, topo: InternalTopology) -> None:
         """Restore saved configs into the staging config_dir."""

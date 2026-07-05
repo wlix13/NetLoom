@@ -1,0 +1,8 @@
+[Unit]
+Description=Save network configs to the NetLoom config drive
+# Triggered by netloom-save-config.timer or manually; keep it independent of
+# the shutdown hook so the timer can re-trigger it (no RemainAfterExit).
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/netloom-save-config

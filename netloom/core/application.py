@@ -12,6 +12,7 @@ from .errors import HypervisorError
 
 if TYPE_CHECKING:
     from netloom.components.config.controller import ConfigController
+    from netloom.components.faults.controller import FaultsController
     from netloom.components.infrastructure.controller import InfrastructureController
     from netloom.core.component import BaseComponent
     from netloom.hypervisors.base import BaseHypervisorDriver
@@ -35,6 +36,7 @@ class Application:
     if TYPE_CHECKING:
         # Populated dynamically by register(); declared here for the type checker.
         config: ConfigController
+        faults: FaultsController
         infrastructure: InfrastructureController
 
     def __init__(self) -> None:

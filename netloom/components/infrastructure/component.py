@@ -11,6 +11,7 @@ from rich.table import Table
 
 from netloom.core.component import BaseComponent
 from netloom.core.enums import VMState
+from netloom.core.paramtypes import NodeNameType
 from netloom.models.internal import InternalTopology
 
 from .controller import InfrastructureController, NodeStatus
@@ -65,7 +66,9 @@ class InfrastructureComponent(BaseComponent["Application", InfrastructureControl
             app.console.print("[green]✓ Created linked clones and config-drives.[/green]")
 
         @steps.command("gen")
-        @click.option("--node", "-n", "node_name", default=None, help="Generate config only for this node.")
+        @click.option(
+            "--node", "-n", "node_name", default=None, type=NodeNameType(), help="Generate config only for this node."
+        )
         @click.pass_obj
         def generate(obj: dict, node_name: str | None) -> None:
             """Generate configs for all nodes (or a single node with --node).
@@ -80,22 +83,11 @@ class InfrastructureComponent(BaseComponent["Application", InfrastructureControl
             app = obj["app"]
             internal: InternalTopology = obj["internal"]
 
+            app.config.generate(internal, node_name=node_name)
             if node_name:
-                target = internal.get_node(node_name)
-                single = InternalTopology(
-                    id=internal.id,
-                    name=internal.name,
-                    description=internal.description,
-                    vbox=internal.vbox,
-                    nodes=[target],
-                    networks=internal.networks,
-                    links=internal.links,
-                )
-                app.config.generate(single)
                 app.console.print(f"[green]✓ Config generated for node '{node_name}'.[/green]")
                 return
 
-            app.config.generate(internal)
             rendered = app.config.rendered_sets(internal)
             app.console.print(f"[green]✓ Templates rendered: {', '.join(sorted(rendered))}[/green]")
 
@@ -197,7 +189,7 @@ class InfrastructureComponent(BaseComponent["Application", InfrastructureControl
         # ── runtime: status / connect ─────────────────────────────────────────
 
         @base.command()
-        @click.option("--node", "-n", "node_name", default=None, help="Show only this node.")
+        @click.option("--node", "-n", "node_name", default=None, type=NodeNameType(), help="Show only this node.")
         @click.pass_obj
         def status(obj: dict, node_name: str | None) -> None:
             """Show live VM state and UART connection port for each node."""
@@ -238,25 +230,12 @@ class InfrastructureComponent(BaseComponent["Application", InfrastructureControl
                 app.console.print(f"[dim]{'  •  '.join(parts)}[/dim]")
 
         @base.command()
-        @click.argument("node")
+        @click.argument("node", type=NodeNameType())
         @click.pass_obj
         def connect(obj: dict, node: str) -> None:
             """Open an interactive console to NODE."""
             app = obj["app"]
-            infra = app.infrastructure
-
-            state = infra.get_vm_state(node)
-            if state is None:
-                app.console.print(f"[red]VM '{node}' not created.[/red] Run 'netloom up' first.")
-                raise SystemExit(1)
-            if state != VMState.RUNNING:
-                app.console.print(f"[red]VM '{node}' is {state}.[/red] Start it with 'netloom steps start'.")
-                raise SystemExit(1)
-
-            info = infra.get_connection_info(node)
-            if info is None:
-                app.console.print(f"[red]No console connection available for '{node}'.[/red]")
-                raise SystemExit(1)
+            info = app.infrastructure.prepare_connect(node)
 
             if info.protocol == "tcp-serial":
                 from netloom.connect import run_bridge

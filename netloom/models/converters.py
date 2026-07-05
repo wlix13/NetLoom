@@ -59,8 +59,8 @@ class TopologyConverter:
 
         return reserved
 
-    def _allocate_nic_index(self, node_name: str, ifname: str, explicit_idx: int | None = None) -> int:
-        """Allocate a VirtualBox NIC index for an interface."""
+    def _allocate_nic_slot(self, node_name: str, ifname: str, explicit_idx: int | None = None) -> int:
+        """Allocate a hypervisor NIC adapter slot for an interface."""
 
         allocations = self._nic_allocations.setdefault(node_name, set())
 
@@ -361,7 +361,7 @@ class TopologyConverter:
                 iface_config = participant_node.interfaces[iface_name]
 
                 mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node_name}-{iface_name}")
-                vbox_nic_index = self._allocate_nic_index(node_name, iface_name, iface_config.index)
+                nic_slot = self._allocate_nic_slot(node_name, iface_name, iface_config.index)
 
                 peer_node: str | None = None
                 if len(participants) == 2:
@@ -377,7 +377,7 @@ class TopologyConverter:
                         gateway=iface_config.gateway,
                         dhcp=iface_config.dhcp,
                         mtu=iface_config.mtu,
-                        vbox_nic_index=vbox_nic_index,
+                        nic_slot=nic_slot,
                         network=vbox_net,
                         peer_node=peer_node,
                         configured=iface_config.configured,
@@ -407,7 +407,7 @@ class TopologyConverter:
                 if iface_config.nat:
                     # NAT mode: allocate a VirtualBox NIC slot, internet via host NAT
                     mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node.name}-{iface_name}")
-                    vbox_nic_index = self._allocate_nic_index(node.name, iface_name, iface_config.index)
+                    nic_slot = self._allocate_nic_slot(node.name, iface_name, iface_config.index)
                     node_interfaces[node.name].append(
                         InternalInterface(
                             name=iface_name,
@@ -417,7 +417,7 @@ class TopologyConverter:
                             gateway=iface_config.gateway,
                             dhcp=iface_config.dhcp,
                             mtu=iface_config.mtu,
-                            vbox_nic_index=vbox_nic_index,
+                            nic_slot=nic_slot,
                             nat=True,
                             configured=iface_config.configured,
                         )
@@ -426,7 +426,7 @@ class TopologyConverter:
                 elif iface_config.kind == InterfaceKind.PHYSICAL:
                     # None mode: physical interface, slot reserved but disconnected
                     mac = iface_config.mac or generate_mac(seed=f"{topo_id}-{node.name}-{iface_name}")
-                    vbox_nic_index = self._allocate_nic_index(node.name, iface_name, iface_config.index)
+                    nic_slot = self._allocate_nic_slot(node.name, iface_name, iface_config.index)
                     node_interfaces[node.name].append(
                         InternalInterface(
                             name=iface_name,
@@ -436,7 +436,7 @@ class TopologyConverter:
                             gateway=iface_config.gateway,
                             dhcp=iface_config.dhcp,
                             mtu=iface_config.mtu,
-                            vbox_nic_index=vbox_nic_index,
+                            nic_slot=nic_slot,
                             configured=iface_config.configured,
                         )
                     )

@@ -35,13 +35,13 @@ class InternalVBoxSettings(BaseModel):
     """Enable High Precision Event Timer."""
 
 
-def ifname_to_vbox_adapter_index(ifname: str) -> int:
-    """Convert interface name to VirtualBox adapter index."""
+def ifname_to_nic_slot(ifname: str) -> int:
+    """Convert an ethN interface name to its 1-based hypervisor NIC slot."""
 
     if not ifname.startswith("eth"):
-        raise ValueError(f"Only ethN are mappable to VirtualBox NICs: {ifname!r}")
+        raise ValueError(f"Only ethN are mappable to hypervisor NICs: {ifname!r}")
     idx = int(ifname[3:])
-    return idx + 1  # VBox NICs start at 1
+    return idx + 1  # NIC slots start at 1
 
 
 class InternalResources(BaseModel):
@@ -64,7 +64,7 @@ class InternalInterface(BaseModel):
     """Interface name (eth1, eth2...)."""
 
     kind: InterfaceKind = InterfaceKind.PHYSICAL
-    """Interface kind. Loopback interfaces have no VirtualBox NIC and no MAC."""
+    """Interface kind. Loopback interfaces have no hypervisor NIC and no MAC."""
 
     mac_address: str | None = None
     """MAC address."""
@@ -75,14 +75,14 @@ class InternalInterface(BaseModel):
     gateway: str | None = None
     """Gateway IP."""
 
-    vbox_nic_index: int | None = None
-    """VirtualBox NIC index."""
+    nic_slot: int | None = None
+    """1-based hypervisor NIC adapter slot."""
 
     network: str | None = None
-    """VirtualBox internal network name (acts as L2 switch)."""
+    """L2 segment name (mapped by the driver to an internal network / virtual switch)."""
 
     nat: bool = False
-    """Whether this interface uses VirtualBox NAT mode."""
+    """Whether this interface uses the hypervisor's NAT mode."""
 
     dhcp: bool = False
     """Enable DHCP on this interface."""
@@ -104,7 +104,7 @@ class InternalInterface(BaseModel):
             invalid = [
                 name
                 for name, value in {
-                    "vbox_nic_index": self.vbox_nic_index,
+                    "nic_slot": self.nic_slot,
                     "network": self.network,
                     "mac_address": self.mac_address,
                 }.items()
@@ -389,13 +389,13 @@ class InternalNode(BaseModel):
 
 
 class InternalNetwork(BaseModel):
-    """Internal representation of a shared L2 network (VirtualBox internal network)."""
+    """Internal representation of a shared L2 network segment."""
 
     name: str
     """User-defined network name."""
 
     network: str
-    """VirtualBox internal network name (acts as L2 switch)."""
+    """L2 segment name (mapped by the driver to an internal network / virtual switch)."""
 
     participants: list[tuple[str, str]] = Field(default_factory=list)
     """List of (node_name, interface_name) pairs connected to this network."""
@@ -416,7 +416,7 @@ class InternalLink(BaseModel):
     """Interface name on node_b (e.g., eth1)."""
 
     network: str
-    """VirtualBox internal network name for this link (acts as L2 switch)."""
+    """L2 segment name for this link (mapped by the driver to an internal network / virtual switch)."""
 
 
 class InternalTopology(BaseModel):

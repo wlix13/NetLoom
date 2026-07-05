@@ -1,0 +1,46 @@
+#!/bin/bash
+# Patched reference for the livecd-fetch-cdrom package script.
+# Changes vs. the original:
+#   1. Prefer mounting the config drive by FAT volume label (NETLOOM) —
+#      works for both VirtualBox (/dev/sdb) and QEMU virtio (/dev/vdb).
+#   2. Replace `systemctl enable --now` with enable + `start --no-block`:
+#      this unit blocks sysinit.target, while starting a service waits for
+#      basic.target (which is after sysinit) — `--now` therefore deadlocks
+#      early boot until the job times out.
+
+MOUNT_POINT="/mnt/vbox-config"
+CP_DESTINATION="/"
+SERVICES_FILE="$MOUNT_POINT/services.list"
+
+MOUNT_DEVICE="/dev/disk/by-label/NETLOOM"
+if [ ! -e "$MOUNT_DEVICE" ]; then
+    MOUNT_DEVICE=""
+    for device in vdb sdb sdb1; do
+        if [ -b "/dev/$device" ]; then
+            MOUNT_DEVICE="/dev/$device"
+        fi
+    done
+fi
+
+[ -n "$MOUNT_DEVICE" ] || exit 0
+
+mkdir -p "$MOUNT_POINT"
+mount -o ro,fmask=0133,dmask=0022 "$MOUNT_DEVICE" "$MOUNT_POINT"
+
+cp -ar "$MOUNT_POINT"/. "$CP_DESTINATION"/
+while IFS= read -r service; do
+        read -r mode entities <<< "$service"
+        case "$mode" in
+            +*)
+                systemctl enable $entities
+                systemctl start --no-block $entities
+                ;;
+            -*)
+                systemctl disable $entities
+                systemctl stop --no-block $entities
+                ;;
+        esac
+done < "$SERVICES_FILE"
+
+umount "$MOUNT_POINT"
+exit 0

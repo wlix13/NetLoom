@@ -1,0 +1,37 @@
+#!/bin/bash
+# netloom-save-config — copy live network configs back onto the NetLoom config drive.
+#
+# Counterpart of livecd-fetch-cdrom: fetch is drive → /etc at boot, this is
+# /etc → drive at runtime/shutdown, so the host-side `netloom save` sees the
+# student's actual changes.
+
+LABEL="NETLOOM"
+MOUNT_POINT="/mnt/netloom-config"
+SAVE_PATHS="/etc/systemd/network /etc/bird /etc/wireguard /etc/sysctl.d /etc/nftables.conf /etc/hostname"
+
+DEVICE="/dev/disk/by-label/$LABEL"
+if [ ! -e "$DEVICE" ]; then
+    # Drives created before labelling: probe common names (virtio first).
+    for candidate in vdb sdb sdb1; do
+        if [ -b "/dev/$candidate" ]; then
+            DEVICE="/dev/$candidate"
+            break
+        fi
+    done
+fi
+
+[ -e "$DEVICE" ] || exit 0
+
+mkdir -p "$MOUNT_POINT"
+mount -o rw "$DEVICE" "$MOUNT_POINT" || exit 1
+trap 'umount "$MOUNT_POINT"' EXIT
+
+for path in $SAVE_PATHS; do
+    [ -e "$path" ] || continue
+    dest="$MOUNT_POINT$(dirname "$path")"
+    mkdir -p "$dest"
+    cp -ar "$path" "$dest/"
+done
+
+sync
+exit 0

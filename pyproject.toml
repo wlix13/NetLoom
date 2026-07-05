@@ -15,19 +15,29 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
+  "click",
   "fattools",
   "jinja2",
   "orjson",
   "pydantic",
-  "pydantic-yaml",
   "pyyaml",
+  "rich",
   "rich-click",
 ]
-scripts.netloom = "netloom.cli:cli"
+scripts.netloom = "netloom.cli:main"
 
 [dependency-groups]
-dev = [ "poethepoet", "prek", "ruff", "ty" ]
+dev = [ "deptry", "import-linter", "poethepoet", "prek", "ruff", "ty" ]
 docs = [ "mkdocs", "mkdocs-material", "mkdocs-static-i18n" ]
+tests = [
+  "pytest",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest-randomly",
+  "pytest-sugar",
+  "pytest-xdist",
+  "syrupy",
+]
 
 [tool.hatch]
 build.targets.sdist.include = [ "netloom/**/*.py", "netloom/templates/**/*.j2" ]
@@ -46,16 +56,82 @@ lint.ignore = [
   "D401", # don't enforce imperative mood
   "D419", # allow empty docstrings
 ]
+lint.per-file-ignores."netloom/components/*/errors.py" = [ "N818" ]
+lint.per-file-ignores."tests/*" = [ "S101", "S311" ]
+lint.isort.known-first-party = [ "netloom", "tests" ]
 lint.isort.lines-after-imports = 2
 lint.pydocstyle.convention = "pep257"
 
+[tool.deptry]
+known_first_party = [ "netloom" ]
+
 [tool.ty]
 environment.root = [ "." ]
+
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = "-ra -q --tb=short --strict-markers -m 'not integration'"
+ini_options.markers = [
+  "unit: pure logic, no I/O beyond tmp_path",
+  "component: several units together against real files, no VMs",
+  "integration: requires VirtualBox and real lab VMs (NETLOOM_LAB=1)",
+]
+
+[tool.importlinter]
+root_package = "netloom"
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Layering: cli -> components -> hypervisors -> models -> core"
+type = "layers"
+layers = [
+  "netloom.cli",
+  "netloom.components",
+  "netloom.hypervisors",
+  "netloom.models",
+  "netloom.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Components are independent of each other"
+type = "independence"
+modules = [
+  "netloom.components.config",
+  "netloom.components.faults",
+  "netloom.components.infrastructure",
+]
+
+[[tool.importlinter.contracts]]
+name = "Hypervisor drivers never import components or CLI"
+type = "forbidden"
+source_modules = [ "netloom.hypervisors" ]
+forbidden_modules = [ "netloom.components", "netloom.cli" ]
+
+[[tool.importlinter.contracts]]
+name = "Core imports nothing above it"
+type = "forbidden"
+source_modules = [ "netloom.core" ]
+forbidden_modules = [
+  "netloom.cli",
+  "netloom.components",
+  "netloom.connect",
+  "netloom.data",
+  "netloom.hypervisors",
+  "netloom.models",
+  "netloom.templates",
+  "netloom.utils",
+]
 
 [tool.poe]
 tasks.format = "uv run ruff format ."
 tasks.check-format = "uv run ruff format --check ."
 tasks.lint = "uv run ruff check ."
-tasks.typecheck = "uv run ty check"
-tasks.check = [ "check-format", "lint", "typecheck" ]
+tasks.typecheck = "uv run --group tests ty check"
+tasks.lint-imports = { cmd = "uv run lint-imports", env = { PYTHONUTF8 = "1" } }
+tasks.deptry = "uv run deptry netloom"
+tasks.check = [ "check-format", "lint", "typecheck", "lint-imports" ]
+tasks.tests = "uv run --group tests pytest"
+tasks.tests-parallel = "uv run --group tests pytest -n auto"
+tasks.tests-integration = "uv run --group tests pytest -m integration"
+tasks.coverage = "uv run --group tests pytest --cov=netloom --cov-report=term"
 tasks.docs = "uv run --group docs mkdocs serve -f mkdocs.yaml"

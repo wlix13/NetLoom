@@ -23,3 +23,11 @@ class HypervisorError(NetLoomError):
 
 class TemplateError(NetLoomError):
     """Raised for template registry and rendering failures."""
+
+
+class FaultError(NetLoomError):
+    """Raised for fault-injection (broken-lab) failures."""
+
+
+class SerialConsoleError(NetLoomError):
+    """Raised for serial-console connection and command-execution failures."""

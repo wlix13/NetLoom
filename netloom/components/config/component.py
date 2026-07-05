@@ -89,11 +89,19 @@ class ConfigComponent(BaseComponent["Application", ConfigController]):
         # ── save / restore / list-templates ──────────────────────────────────
 
         @base.command()
+        @click.option(
+            "--sync",
+            is_flag=True,
+            help=(
+                "Experimental: first ask each running guest over its serial console "
+                "to copy its live /etc configs onto the config drive."
+            ),
+        )
         @click.pass_obj
-        def save(obj: dict) -> None:
+        def save(obj: dict, sync: bool) -> None:
             """Pull changed files from config-drive back to workdir/saved/<node>/."""
             app = obj["app"]
-            app.config.save(obj["internal"])
+            app.config.save(obj["internal"], sync=sync)
             app.console.print("[green]✓ Saved config-drive contents to host.[/green]")
 
         @base.command()

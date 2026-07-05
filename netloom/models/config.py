@@ -75,15 +75,15 @@ class InterfaceConfig(BaseModel):
     kind: InterfaceKind = Field(
         default=InterfaceKind.PHYSICAL,
         description=(
-            "Interface kind. 'physical' gets a VirtualBox NIC when 'network' is set. "
-            "'loopback' is OS-only: no VirtualBox NIC, no MAC, skips .link template."
+            "Interface kind. 'physical' gets a hypervisor NIC when 'network' is set. "
+            "'loopback' is OS-only: no hypervisor NIC, no MAC, skips .link template."
         ),
     )
     index: int | None = Field(
         default=None,
         ge=1,
         le=36,
-        description="VirtualBox adapter slot (1-36). Auto-assigned if omitted.",
+        description="NIC adapter slot (1-36). Auto-assigned if omitted.",
     )
     mac: str | None = Field(
         default=None,
